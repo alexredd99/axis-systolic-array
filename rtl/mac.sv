@@ -10,7 +10,7 @@ module mul #(
   input  logic signed [WK-1:0] k,
   output logic signed [WY-1:0] y
 );
-  logic [WY-1:0] m;
+  logic signed [WY-1:0] m;
   always_ff @(posedge clk)
     if (!rstn)    m <= '0;
     else if (en)  m <= $signed(x) * $signed(k);
@@ -25,10 +25,10 @@ module acc #(
   input  logic signed [WX-1:0] x,
   output logic signed [WY-1:0] y
 );
-  logic [WY-1:0] a;
+  logic signed [WY-1:0] a;
   always_ff @(posedge clk)
     if (!rstn)   a <= '0;
-    else if (en) a <= x + (first ? '0 : a);
+    else if (en) a <= $signed(x) + $signed(first ? '0 : a);
 
   n_delay #(.N(L-1),.W(WY)) mac_delay (.c(clk),.e(en),.rng(rstn),.rnl(rstn),.i(a),.o(y),.d());
 endmodule

@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-`define DIAG(a, b) ((a > b) ? a : b)
+`define DIAG(a, b) (a+b)
 
 // AXI Stream Systolic Array
 
@@ -30,7 +30,7 @@ module axis_sa #(
 
   logic [LM-1:0] ml_first, ml_valid;
   logic [LA-1:0] al_valid;
-  logic [D -1:0] md_first, sd_valid, md_valid, ad_valid, r_valid, reg_copy, reg_clear;
+  logic [D -1:0] md_first, sd_valid, md_valid, ad_valid, en_acc, r_valid, reg_copy, reg_clear;
   logic [C -1:0] r_last;
 
   // Global Control
@@ -39,29 +39,25 @@ module axis_sa #(
   assign en_shift = m_valid && m_ready;      // shift only when last col has value (m_valid) and mready
   assign s_ready  = en_mac;
 
-
   // Triangular Buffer for x and k
   tri_buffer #(.W(WX), .N(R)) TRI_X (.clk(clk), .rstn(rstn), .cen(en_mac), .x(sx_data), .y(xi_delayed));
   tri_buffer #(.W(WK), .N(C)) TRI_K (.clk(clk), .rstn(rstn), .cen(en_mac), .x(sk_data), .y(ki_delayed));
-
-  // Assign first row & column
-
-  for (r=0; r<R; r=r+1)
-    assign xi[r][0] = xi_delayed[r];
-  for (c=0; c<C; c=c+1)
-    assign ki[0][c] = ki_delayed[c];
 
   // Propagate x and k through the array
 
   for (r=0; r<R; r=r+1)
     for (c=0; c<C; c=c+1) begin
 
-      if (c!=0)  // move x through cols
+      if (c==0) 
+        assign xi[r][c] = xi_delayed[r];  
+      else // move x through cols
         always_ff @(posedge clk)
           if (!rstn)       xi[r][c] <= '0;
           else if (en_mac) xi[r][c] <= xi[r][c-1];
       
-      if (r!=0) // move k through rows
+      if (r==0)
+        assign ki[r][c] = ki_delayed[c];
+      else // move k through rows
         always_ff @(posedge clk)
           if (!rstn)       ki[r][c] <= '0;
           else if (en_mac) ki[r][c] <= ki[r-1][c];
@@ -72,19 +68,8 @@ module axis_sa #(
   n_delay #(.N(D), .W(1)) SD_VALID_D  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid), .o(), .d(sd_valid));
 
   for (r=0; r<R; r=r+1) begin: MR
-    for (c=0; c<C; c=c+1) begin: MC
-      mul #(
-        .WX (WX), 
-        .WK (WK), 
-        .L  (LM)
-      ) MUL (
-        .clk   (clk        ), 
-        .rstn  (rstn       ), 
-        .en    (en_mac && sd_valid[`DIAG(r,c)]), // only multiply valid data
-        .x     (xi   [r][c]), 
-        .k     (ki   [r][c]), 
-        .y     (mo   [r][c])  
-      );
+    for (c=0; c<C; c=c+1) begin: MC    
+      mul #(.WX(WX), .WK(WK), .L(LM)) MUL (.clk(clk), .rstn(rstn), .en(en_mac),.x(xi[r][c]),.k(ki[r][c]),.y(mo[r][c]));
   end end
 
   // Accumulators - cleared at first beat of s_axis packet
@@ -93,23 +78,14 @@ module axis_sa #(
     if (!rstn)       first_xk_00 <= 1'b1;
     else if (en_mac) first_xk_00 <= s_valid && s_last;
 
-  n_delay #(.N(LM+D), .W(1)) M_FIRST_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(first_xk_00), .o(), .d({ml_first, md_first}));
-  n_delay #(.N(LM+D), .W(1)) M_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid)    , .o(), .d({ml_valid, md_valid}));
+  n_delay #(.N(LM+D), .W(1)) M_FIRST_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(first_xk_00), .o(), .d({md_first, ml_first}));
+  n_delay #(.N(LM+D), .W(1)) M_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid)    , .o(), .d({md_valid, ml_valid}));
 
   for (r=0; r<R; r=r+1) begin: AR
     for (c=0; c<C; c=c+1) begin: AC
-      acc #(
-        .WX (WM), 
-        .WY (WY), 
-        .L  (LA)
-      ) ACC (
-        .clk   (clk         ), 
-        .rstn  (rstn        ), 
-        .en    (en_mac && md_valid[`DIAG(r,c)]), // only accumulate valid data
-        .first (md_first [`DIAG(r,c)]), 
-        .x     (mo    [r][c]), 
-        .y     (ao    [r][c])  
-      );
+    // only accumulate valid data
+      assign en_acc[`DIAG(r,c)] = en_mac && md_valid[`DIAG(r,c)]; 
+      acc #(.WX(WM),.WY(WY),.L(LA)) ACC (.clk(clk), .rstn(rstn), .en(en_acc[`DIAG(r,c)]), .first (md_first[`DIAG(r,c)]), .x(mo[r][c]), .y(ao[r][c]));
   end end
 
   // Output Register Control
@@ -129,28 +105,24 @@ module axis_sa #(
       if (!rstn)             r_valid[d] <= 1'b0;
       else if (reg_copy [d]) r_valid[d] <= 1'b1;
       else if (reg_clear[d]) r_valid[d] <= 1'b0;
-    always_ff @(posedge clk)
-      if (!rstn)             r_valid[d] <= 1'b0;
-      else if (reg_copy [d]) r_valid[d] <= 1'b1;
-      else if (reg_clear[d]) r_valid[d] <= 1'b0;
   end
 
   // Output Register Data
 
-  
   for (r=0; r<R; r=r+1) begin
-    always_ff @(posedge clk) // c=0
+    // c=0
+    always_ff @(posedge clk)
       if (!rstn)                       ro[r][0] <= '0;
       else if (reg_copy[`DIAG(r,0)])   ro[r][0] <= ao[r][0];
-
-    for (c=1; c<C; c=c+1) // c!=0
+    // c!=0
+    for (c=1; c<C; c=c+1)
       always_ff @(posedge clk)
         if (!rstn)                     ro[r][c] <= '0;
         else if (reg_copy[`DIAG(r,c)]) ro[r][c] <= ao[r][c];
         else if (en_shift)             ro[r][c] <= ro[r][c-1];
   end
 
-  // Output control
+  // Outputs
 
   assign m_valid = r_valid[C-1];
   assign m_last  = r_last [C-1];
@@ -158,5 +130,4 @@ module axis_sa #(
   for (r=0; r<R; r=r+1)
     assign m_data[r] = ro[r][C-1];
   
-
 endmodule

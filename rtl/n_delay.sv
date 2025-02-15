@@ -24,7 +24,7 @@ module n_delay #(
   end
   endgenerate
 
-  if (N > 1) assign d = data[N:1];
+  if (N > 1) assign d = data[N-1:0];
   else       assign d = data[0];
 
 endmodule

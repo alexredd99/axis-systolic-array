@@ -7,8 +7,8 @@ module axis_sa_tb;
     K          = 2,
     WX         = 4, 
     WK         = 4,
-    LM         = 2,
-    LA         = 2,
+    LM         = 1,
+    LA         = 1,
     WY         = WX + WK + $clog2(K),
     WXK_BUS    = WX*R + WK*C,
     WY_BUS     = WY*R,
@@ -64,22 +64,30 @@ module axis_sa_tb;
       file_exp = $fopen(path_exp, "w");
 
       // Randomize x
+      xm[n][0][0] = -1;
+      xm[n][0][1] =  2;
+      xm[n][1][0] =  3;
+      xm[n][1][1] = -1; 
       $display("%0d) xm:", n);
       for (int r=0; r<R; r++) begin
         $write("| ");
         for (int k=0; k<K; k++) begin
-          xm[n][r][k] = WX'($urandom_range(0,2**WX-1));
+          // xm[n][r][k] = WX'($urandom_range(0,2**WX-1));
           $write("%d ",  $signed(xm[n][r][k]));
         end 
         $write("|\n");
       end
 
       // Randomize k
+      km[n][0][0] = 7;
+      km[n][0][1] = 6;
+      km[n][1][0] =-4;
+      km[n][1][1] = 6; 
       $display("%0d) km:", n);
       for (int k=0; k<K; k++) begin
         $write("| ");
         for (int c=0; c<R; c++) begin
-          km[n][k][c] = WK'($urandom_range(0,2**WK-1));
+          // km[n][k][c] = WK'($urandom_range(0,2**WK-1));
           $write("%d ",  $signed(km[n][k][c]));
         end
         $write("|\n");
