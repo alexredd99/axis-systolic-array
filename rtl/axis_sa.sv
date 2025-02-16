@@ -15,7 +15,7 @@ module axis_sa #(
   );
 
   genvar r, c, d ;
-  localparam D  = `DIAG(R,C); // length of diagonal
+  localparam D  = `DIAG(R,C)-1; // length of diagonal
   localparam WM = WX + WK;
 
   logic en_mac, en_shift, first_xk_00;
@@ -28,13 +28,12 @@ module axis_sa #(
   logic [R-1:0][C-1:0][WM-1:0] mo;
   logic [R-1:0][C-1:0][WY-1:0] ao, ro;
 
-  logic [LM-1:0] ml_first, ml_valid;
+  logic [LM-1:0] ml_first, ml_valid, ml_valid_last;
   logic [LA-1:0] al_valid;
-  logic [D -1:0] md_first, sd_valid, md_valid, ad_valid, en_acc, r_valid, reg_copy, reg_clear;
-  logic [C -1:0] r_last;
+  logic [D -1:0] md_first, sd_valid, md_valid, md_valid_last, ad_valid, en_acc, r_valid, reg_copy, reg_clear;
+  logic [D -1:0] r_last;
 
   // Global Control
-  
   assign en_mac   = !(|(r_valid & ad_valid)); // pull en_mac down if any acc is pushing data (avalid) and reg already has data (r_valid)
   assign en_shift = m_valid && m_ready;      // shift only when last col has value (m_valid) and mready
   assign s_ready  = en_mac;
@@ -43,8 +42,14 @@ module axis_sa #(
   tri_buffer #(.W(WX), .N(R)) TRI_X (.clk(clk), .rstn(rstn), .cen(en_mac), .x(sx_data), .y(xi_delayed));
   tri_buffer #(.W(WK), .N(C)) TRI_K (.clk(clk), .rstn(rstn), .cen(en_mac), .x(sk_data), .y(ki_delayed));
 
-  // Propagate x and k through the array
+  // Delay control signals
+  n_delay #(.N(D   ), .W(1)) SD_VALID_D     (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid          ), .o(), .d(sd_valid));
+  n_delay #(.N(LM+D), .W(1)) M_FIRST_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(first_xk_00      ), .o(), .d({md_first     , ml_first     }));
+  n_delay #(.N(LM+D), .W(1)) M_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid          ), .o(), .d({md_valid     , ml_valid     }));
+  n_delay #(.N(LM+D), .W(1)) M_VD_LS_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid && s_last), .o(), .d({md_valid_last, ml_valid_last}));
+  n_delay #(.N(LA+D), .W(1)) A_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(md_valid_last [0]), .o(), .d({ad_valid     , al_valid     }));
 
+  // Propagate x and k through the array
   for (r=0; r<R; r=r+1)
     for (c=0; c<C; c=c+1) begin
 
@@ -64,22 +69,15 @@ module axis_sa #(
     end
 
   // Multipliers
-
-  n_delay #(.N(D), .W(1)) SD_VALID_D  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid), .o(), .d(sd_valid));
-
   for (r=0; r<R; r=r+1) begin: MR
     for (c=0; c<C; c=c+1) begin: MC    
       mul #(.WX(WX), .WK(WK), .L(LM)) MUL (.clk(clk), .rstn(rstn), .en(en_mac),.x(xi[r][c]),.k(ki[r][c]),.y(mo[r][c]));
   end end
 
   // Accumulators - cleared at first beat of s_axis packet
-
   always_ff @(posedge clk)
-    if (!rstn)       first_xk_00 <= 1'b1;
-    else if (en_mac) first_xk_00 <= s_valid && s_last;
-
-  n_delay #(.N(LM+D), .W(1)) M_FIRST_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(first_xk_00), .o(), .d({md_first, ml_first}));
-  n_delay #(.N(LM+D), .W(1)) M_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid)    , .o(), .d({md_valid, ml_valid}));
+    if (!rstn)                  first_xk_00 <= 1'b1;
+    else if (en_mac && s_valid) first_xk_00 <= s_last;
 
   for (r=0; r<R; r=r+1) begin: AR
     for (c=0; c<C; c=c+1) begin: AC
@@ -89,9 +87,6 @@ module axis_sa #(
   end end
 
   // Output Register Control
-
-  n_delay #(.N(LA+D), .W(1)) A_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(md_first[0]), .o(), .d({al_valid, ad_valid}));
-
   always_ff @(posedge clk)
     if (!rstn)        r_last <= C'(1'b1); // 0th col is last
     else if (en_shift) 
@@ -108,7 +103,6 @@ module axis_sa #(
   end
 
   // Output Register Data
-
   for (r=0; r<R; r=r+1) begin
     // c=0
     always_ff @(posedge clk)
@@ -123,7 +117,6 @@ module axis_sa #(
   end
 
   // Outputs
-
   assign m_valid = r_valid[C-1];
   assign m_last  = r_last [C-1];
 
