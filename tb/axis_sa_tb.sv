@@ -15,7 +15,7 @@ module axis_sa_tb;
     P_VALID    = 100, 
     P_READY    = 100,
     CLK_PERIOD = 10, 
-    NUM_EXP    = 1;
+    NUM_EXP    = 2;
 
   logic clk=0, rstn=0;
   initial forever #(CLK_PERIOD/2) clk = ~clk;
@@ -131,6 +131,7 @@ module axis_sa_tb;
       $fclose(file_exp);
 
       source.axis_push (path_in);
+      @(posedge clk);
     end
 
   initial begin
@@ -144,6 +145,7 @@ module axis_sa_tb;
     
       path_out = $sformatf("out_%0d.txt",n);
       sink.axis_pull (path_out);
+      $display("Done axis pull");
 
       file_out = $fopen(path_out, "r");
       for (int r=0; r<R; r++)

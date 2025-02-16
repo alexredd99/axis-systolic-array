@@ -38,6 +38,8 @@ module AXIS_Sink #(
             i_words  += 1;
           end
         $fclose(file);
+
+        if(m_last) break;
       end
 
       #10ps // delay before writing
