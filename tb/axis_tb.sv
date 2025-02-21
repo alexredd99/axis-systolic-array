@@ -112,7 +112,8 @@ module AXIS_Source #(
     end
 
     // Reset & close packet after done
-    {s_valid, s_data, s_keep, s_last} = '0;
+    {s_valid, s_data, s_keep, s_last, prev_slast} = '0;
+    prev_handshake = 1;
     $display("Closing file '%s' at i_words=%d \n", file_path, i_words);
     $fclose(file);
 

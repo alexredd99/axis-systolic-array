@@ -28,13 +28,12 @@ module axis_sa #(
   logic [R-1:0][C-1:0][WM-1:0] mo;
   logic [R-1:0][C-1:0][WY-1:0] ao, ro;
 
-  logic [LM-1:0] ml_first, ml_valid, ml_valid_last;
-  logic [LA-1:0] al_valid;
-  logic [D -1:0] md_first, sd_valid, md_valid, md_valid_last, ad_valid, en_acc, r_valid, reg_copy, reg_clear;
-  logic [D -1:0] r_last;
+  logic [D-1:0] en_acc, r_valid, r_last, reg_copy, reg_clear, conflict, ad_valid;
+  logic [LM+D-1:0] first;
+  logic [LM+LA+D-1:0] valid, valid_last;
 
   // Global Control
-  assign en_mac   = !(|(r_valid & ad_valid)); // pull en_mac down if any acc is pushing data (avalid) and reg already has data (r_valid)
+  assign en_mac   = !(|conflict); // pull en_mac down if any acc is pushing data (avalid) and reg already has data (r_valid)
   assign en_shift = r_valid[D-1] && m_ready;  // shift only when entire array is full (m_valid) and mready
   assign s_ready  = en_mac;
 
@@ -47,11 +46,9 @@ module axis_sa #(
   tri_buffer #(.W(WK), .N(C)) TRI_K (.clk(clk), .rstn(rstn), .cen(en_mac), .x(sk_reversed), .y(ki_delayed));
 
   // Delay control signals
-  n_delay #(.N(D   ), .W(1)) SD_VALID_D     (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid          ), .o(), .d(sd_valid));
-  n_delay #(.N(LM+D), .W(1)) M_FIRST_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(first_xk_00      ), .o(), .d({md_first     , ml_first     }));
-  n_delay #(.N(LM+D), .W(1)) M_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid          ), .o(), .d({md_valid     , ml_valid     }));
-  n_delay #(.N(LM+D), .W(1)) M_VD_LS_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid && s_last), .o(), .d({md_valid_last, ml_valid_last}));
-  n_delay #(.N(LA+D), .W(1)) A_VALID_DELAY  (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(md_valid_last [0]), .o(), .d({ad_valid     , al_valid     }));
+  n_delay #(.N(LM   +D), .W(1)) FIRST      (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(first_xk_00       ), .o(), .d(first));
+  n_delay #(.N(LM+LA+D), .W(1)) VALID      (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid           ), .o(), .d(valid));
+  n_delay #(.N(LM+LA+D), .W(1)) VALID_LAST (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid && s_last ), .o(), .d(valid_last));
 
   // Propagate x and k through the array
   for (r=0; r<R; r=r+1)
@@ -86,8 +83,9 @@ module axis_sa #(
   for (r=0; r<R; r=r+1) begin: AR
     for (c=0; c<C; c=c+1) begin: AC
     // only accumulate valid data
-      assign en_acc[`DIAG(r,c)] = en_mac && md_valid[`DIAG(r,c)]; 
-      acc #(.WX(WM),.WY(WY),.L(LA)) ACC (.clk(clk), .rstn(rstn), .en(en_acc[`DIAG(r,c)]), .first (md_first[`DIAG(r,c)]), .x(mo[r][c]), .y(ao[r][c]));
+      localparam d = `DIAG(r,c);
+      assign en_acc[d] = en_mac && valid[LM+d]; 
+      acc #(.WX(WM),.WY(WY),.L(LA)) ACC (.clk(clk), .rstn(rstn), .en(en_acc[d]), .first (first[LM+d]), .x(mo[r][c]), .y(ao[r][c]));
   end end
 
 
@@ -102,15 +100,25 @@ module axis_sa #(
         if (d >= C-1 && m_last) r_last[d] <= 0;            // At the last beat, clear all diagonal regs beyond C
         else                    r_last[d] <= r_last[d-1];  // on non-last beats, shift right
   
-  for (d=0; d<D; d=d+1) begin
-    assign reg_copy [d] = ad_valid[d] && !r_valid[d]; // copy only if acc can send data (ad_valid) and reg is empty (!r_valid)
-    assign reg_clear[d] = en_shift    &&  r_last [d]; // clear if current reg is last
+  for (d=0; d<D; d=d+1)
+    always_ff @(posedge clk)
+      if (!rstn)                         ad_valid[d] <= 0;
+      else if (conflict [d] && en_shift) ad_valid[d] <= 0;
+      else if (en_mac)                   ad_valid[d] <= valid_last[LM+LA+d-1];
+
+  for (d=0; d<D; d=d+1)
+    always_comb begin
+      conflict [d] = r_valid [d] && ad_valid[d]; // acc wants to send data, but reg already has data
+      reg_copy [d] = ad_valid[d] && !r_valid[d]; // copy only if acc can send data (ad_valid) and reg is empty (!r_valid)
+      reg_clear[d] = en_shift    &&  r_last [d]; // clear if current reg is last
+    end
+
+  for (d=0; d<D; d=d+1)
     always_ff @(posedge clk)
       if (!rstn)                               r_valid[d] <= 0;
       else if (d >= C-1 && en_shift && m_last) r_valid[d] <= 0; // At the last beat, clear all diagonal regs beyond C
       else if (reg_copy [d])                   r_valid[d] <= 1;
       else if (reg_clear[d])                   r_valid[d] <= 0;
-  end
 
   // Output Register Data
   for (r=0; r<R; r=r+1) begin

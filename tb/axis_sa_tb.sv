@@ -1,10 +1,11 @@
 `timescale 1ns/1ps
+`define DIAG(a, b) (a+b)
 
 module axis_sa_tb;
   localparam 
     R          = 2, 
     C          = 2, 
-    K          = 2,
+    K          = 6,
     WX         = 4, 
     WK         = 4,
     LM         = 1,
@@ -15,7 +16,7 @@ module axis_sa_tb;
     P_VALID    = 100, 
     P_READY    = 100,
     CLK_PERIOD = 10, 
-    NUM_EXP    = 2;
+    NUM_EXP    = 50;
 
   logic clk=0, rstn=0;
   initial forever #(CLK_PERIOD/2) clk = ~clk;
@@ -52,11 +53,11 @@ module axis_sa_tb;
   logic [C-1:0][WK-1:0] k_col;
   logic [WXK_BUS/2-1:0][1:0] xk2;
   logic [WY-1:0] y_val;
+  int ur = $urandom(500);
 
   
   initial 
     for (int n=0; n<NUM_EXP; n++) begin
-
       path_in  = $sformatf("inp_%0d.txt",n);
       file_in  = $fopen(path_in , "w");
 
@@ -64,30 +65,22 @@ module axis_sa_tb;
       file_exp = $fopen(path_exp, "w");
 
       // Randomize x
-      xm[n][0][0] = -1;
-      xm[n][0][1] =  2;
-      xm[n][1][0] =  3;
-      xm[n][1][1] = -1; 
       $display("%0d) xm:", n);
       for (int r=0; r<R; r++) begin
         $write("| ");
         for (int k=0; k<K; k++) begin
-          // xm[n][r][k] = WX'($urandom_range(0,2**WX-1));
+          xm[n][r][k] = WX'($urandom_range(0,2**WX-1));
           $write("%d ",  $signed(xm[n][r][k]));
         end 
         $write("|\n");
       end
 
       // Randomize k
-      km[n][0][0] = 7;
-      km[n][0][1] = 6;
-      km[n][1][0] =-4;
-      km[n][1][1] = 6; 
       $display("%0d) km:", n);
       for (int k=0; k<K; k++) begin
         $write("| ");
         for (int c=0; c<R; c++) begin
-          // km[n][k][c] = WK'($urandom_range(0,2**WK-1));
+          km[n][k][c] = WK'($urandom_range(0,2**WK-1));
           $write("%d ",  $signed(km[n][k][c]));
         end
         $write("|\n");
@@ -123,7 +116,7 @@ module axis_sa_tb;
       end
 
 
-      for (int c=C-1; c>=0; c--) // last column comes out first
+      for (int c=0; c<C; c++) // last column comes out first
         for (int r=0; r<R; r++)
           $fdisplay(file_exp, "%d",  $signed(ym[n][r][c]));
       
@@ -131,7 +124,6 @@ module axis_sa_tb;
       $fclose(file_exp);
 
       source.axis_push (path_in);
-      @(posedge clk);
     end
 
   initial begin
@@ -158,4 +150,37 @@ module axis_sa_tb;
     $finish();
   end
 
+  // debug signals
+  localparam WM = WX + WK;
+  struct { logic [WX-1:0] d; logic v;         } xi [R][C];
+  struct { logic [WK-1:0] d; logic v;         } ki [R][C];
+  struct { logic [WM-1:0] d; logic v; logic f;} mo [R][C];
+  struct { logic [WY-1:0] d; logic v, vin, cf;    } ao [R][C];
+  struct { logic [WY-1:0] d; logic v, l, cp, cl, cf;      } ro [R][C];
+
+  genvar r,c;
+  for (r=0; r<R; r++)
+    for (c=0; c<C; c++)
+      always_comb begin
+
+        xi[r][c].d = DUT.xi[r][c];
+        ki[r][c].d = DUT.ki[r][c];
+        mo[r][c].d = DUT.mo[r][c];
+        ao[r][c].d = DUT.ao[r][c];
+        ro[r][c].d = DUT.ro[r][c];
+
+        xi[r][c].v   = DUT.valid[`DIAG(r,c)];
+        ki[r][c].v   = DUT.valid[`DIAG(r,c)];
+        mo[r][c].v   = DUT.valid[LM+`DIAG(r,c)];
+        mo[r][c].f   = DUT.first[LM+`DIAG(r,c)];
+        ao[r][c].vin = DUT.valid_last[LM+LA+`DIAG(r,c)];
+
+        ao[r][c].v   = DUT.ad_valid[`DIAG(r,c)];
+        ao[r][c].cf  = DUT.conflict[`DIAG(r,c)];
+        ro[r][c].v   = DUT.r_valid [`DIAG(r,c)];
+        ro[r][c].l   = DUT.r_last  [`DIAG(r,c)];
+        ro[r][c].cp  = DUT.reg_copy[`DIAG(r,c)];
+        ro[r][c].cl  = DUT.reg_clear[`DIAG(r,c)];
+        ro[r][c].cf  = DUT.conflict[`DIAG(r,c)];
+      end
 endmodule 
