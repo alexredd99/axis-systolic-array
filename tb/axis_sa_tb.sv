@@ -3,21 +3,21 @@
 
 module axis_sa_tb;
   localparam 
-    R          = 8, 
-    C          = 4, 
-    K          = 6,
-    WX         = 8, 
-    WK         = 4,
-    LM         = 2,
-    LA         = 3,
-    WM         = WX + WK,
-    WY         = WM + $clog2(K),
-    WXK_BUS    = WX*R + WK*C,
-    WY_BUS     = WY*R,
-    P_VALID    = 1, 
-    P_READY    = 50,
-    CLK_PERIOD = 10, 
-    NUM_EXP    = 50;
+    R          = 8, // Rows of SA == rows of output matrix
+    C          = 4, // Cols of SA == cols of output matrix
+    K          = 2, // Cols of matrix_k and rows of matrix_k
+    WX         = 8, // word width of matrix_k
+    WK         = 4, // word width of matrix_k
+    LM         = 2, // latency of multiplier
+    LA         = 3, // latency of accumulator
+    WM         = WX + WK,        // word width of multiplier
+    WY         = WM + $clog2(K), // word width of accumulator
+    WXK_BUS    = WX*R + WK*C,    // input bus width, R rows of matrix_x and C cols of matrix_k
+    WY_BUS     = WY*R,           // output bus width, R rows of matrix_y
+    P_VALID    = 1,  // Probability with which s_valid is toggled
+    P_READY    = 50, // Probability with which m_ready is toggled
+    CLK_PERIOD = 10,
+    NUM_EXP    = 50;  // Number of experiments
 
   logic clk=0, rstn=0;
   initial forever #(CLK_PERIOD/2) clk = ~clk;
@@ -57,7 +57,7 @@ module axis_sa_tb;
   logic [C-1:0][WK-1:0] k_col;
   logic [WXK_BUS/2-1:0][1:0] xk2;
   logic signed [WY-1:0] y_val, y_exp;
-  int ur = $urandom(500);
+  int ur = $urandom(500); // set random seed to get reproducible results
   int ns, nm;
 
   
@@ -100,7 +100,6 @@ module axis_sa_tb;
           k_col[c] = km[ns][k][c];
 
         xk2 = {k_col, x_row};
-
         for (int i=0; i<WXK_BUS/2; i++)
           $fdisplay(file_in, "%d", xk2[i]);
       end
@@ -123,8 +122,7 @@ module axis_sa_tb;
         $write("|\n");
       end
 
-
-      for (int c=0; c<C; c++) // last column comes out first
+      for (int c=0; c<C; c++)
         for (int r=0; r<R; r++)
           $fdisplay(file_exp, "%d",  $signed(ym[ns][r][c]));
       
@@ -159,11 +157,11 @@ module axis_sa_tb;
   end
 
   // debug signals
-  struct { logic [WX-1:0] d; logic v;         } xi [R][C];
-  struct { logic [WK-1:0] d; logic v;         } ki [R][C];
-  struct { logic [WM-1:0] d; logic v; logic f;} mo [R][C];
-  struct { logic [WY-1:0] d; logic v, vin, cf;    } ao [R][C];
-  struct { logic [WY-1:0] d; logic v, l, cp, cl, cf;      } ro [R][C];
+  struct { logic [WX-1:0] d; logic v;                } xi [R][C];
+  struct { logic [WK-1:0] d; logic v;                } ki [R][C];
+  struct { logic [WM-1:0] d; logic v, f;             } mo [R][C];
+  struct { logic [WY-1:0] d; logic v, vin, cf;       } ao [R][C];
+  struct { logic [WY-1:0] d; logic v, l, cp, cl, cf; } ro [R][C];
 
   genvar r,c;
   for (r=0; r<R; r++)
