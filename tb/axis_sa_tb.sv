@@ -10,11 +10,12 @@ module axis_sa_tb;
     WK         = 4,
     LM         = 1,
     LA         = 1,
-    WY         = WX + WK + $clog2(K),
+    WM         = WX + WK,
+    WY         = WM + $clog2(K),
     WXK_BUS    = WX*R + WK*C,
     WY_BUS     = WY*R,
     P_VALID    = 1, 
-    P_READY    = 100,
+    P_READY    = 50,
     CLK_PERIOD = 10, 
     NUM_EXP    = 50;
 
@@ -45,9 +46,12 @@ module axis_sa_tb;
 
   // Matrices
   // X(R,K) * K(K,C) = Y(R,C)
-  logic signed [NUM_EXP-1:0][R-1:0][K-1:0][WX-1:0] xm = '0; // (R,K)
-  logic signed [NUM_EXP-1:0][K-1:0][C-1:0][WK-1:0] km = '0; // (K,C)
-  logic signed [NUM_EXP-1:0][R-1:0][C-1:0][WY-1:0] ym = '0; // (R,C)
+  bit signed [NUM_EXP-1:0][R-1:0][K-1:0][WX-1:0] xm = '0; // (R,K)
+  bit signed [NUM_EXP-1:0][K-1:0][C-1:0][WK-1:0] km = '0; // (K,C)
+  bit signed [NUM_EXP-1:0][R-1:0][C-1:0][WY-1:0] ym = '0; // (R,C)
+
+  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WM-1:0] mm = '0;
+  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WY-1:0] am = '0;
 
   logic [R-1:0][WX-1:0] x_row;
   logic [C-1:0][WK-1:0] k_col;
@@ -73,7 +77,7 @@ module axis_sa_tb;
           xm[ns][r][k] = WX'($urandom_range(0,2**WX-1));
           $write("%d ",  $signed(xm[ns][r][k]));
         end 
-        $write("|\ns");
+        $write("|\n");
       end
 
       // Randomize k
@@ -84,7 +88,7 @@ module axis_sa_tb;
           km[ns][k][c] = WK'($urandom_range(0,2**WK-1));
           $write("%d ",  $signed(km[ns][k][c]));
         end
-        $write("|\ns");
+        $write("|\n");
       end
 
       // Concat and write to file
@@ -103,16 +107,19 @@ module axis_sa_tb;
 
       // Expected y
       for (int r=0; r<R; r++)
-        for (int c=0; c<C; c++)
-          for (int k=0; k<K; k++)
-            ym[ns][r][c] = $signed(ym[ns][r][c]) + $signed(xm[ns][r][k]) * $signed(km[ns][k][c]);
+        for (int c=0; c<C; c++) begin
+          for (int k=0; k<K; k++) begin
+            am[ns][k][r][c] = $signed(xm[ns][r][k]) * $signed(km[ns][k][c]) + $signed(am[ns][k-1][r][c]);
+          end
+          ym[ns][r][c] = am[ns][K-1][r][c];
+        end
       
       $display("%0d) ym:", ns);
       for (int r=0; r<R; r++) begin
         $write("| ");
         for (int c=0; c<C; c++)
           $write("%d ",  $signed(ym[ns][r][c]));
-        $write("|\ns");
+        $write("|\n");
       end
 
 
@@ -143,7 +150,7 @@ module axis_sa_tb;
         for (int r=0; r<R; r++) begin
           status = $fscanf(file_out,"%d\n", y_val);
           y_exp = $signed(ym[nm][r][c]);
-          assert (y_val == y_exp) else $fatal("Output does not match, nm=%d, y_val=(%d) != y_exp(%d)", nm, $signed(y_val), $signed(y_exp));
+          assert (y_val == y_exp) else $fatal(1,"Output does not match, nm=%d, y_val=(%d) != y_exp(%d)", nm, $signed(y_val), $signed(y_exp));
         end
       $fclose(file_out);
     end
@@ -151,7 +158,6 @@ module axis_sa_tb;
   end
 
   // debug signals
-  localparam WM = WX + WK;
   struct { logic [WX-1:0] d; logic v;         } xi [R][C];
   struct { logic [WK-1:0] d; logic v;         } ki [R][C];
   struct { logic [WM-1:0] d; logic v; logic f;} mo [R][C];
@@ -172,7 +178,7 @@ module axis_sa_tb;
         xi[r][c].v   = DUT.valid[`DIAG(r,c)];
         ki[r][c].v   = DUT.valid[`DIAG(r,c)];
         mo[r][c].v   = DUT.valid[LM+`DIAG(r,c)];
-        mo[r][c].f   = DUT.first[LM+`DIAG(r,c)];
+        mo[r][c].f   = DUT.m_first[`DIAG(r,c)];
         ao[r][c].vin = DUT.valid_last[LM+LA+`DIAG(r,c)];
 
         ao[r][c].v   = DUT.ad_valid[`DIAG(r,c)];

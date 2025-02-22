@@ -1,8 +1,6 @@
 `timescale 1ns/1ps
 `define DIAG(a, b) (a+b)
 
-// AXI Stream Systolic Array
-
 module axis_sa #(
     parameter  R=4, C=8, WX=4, WK=8, WY=16, LM=1, LA=1
   )(
@@ -28,8 +26,7 @@ module axis_sa #(
   logic [R-1:0][C-1:0][WM-1:0] mo;
   logic [R-1:0][C-1:0][WY-1:0] ao, ro;
 
-  logic [D-1:0] en_acc, r_valid, r_last, reg_copy, reg_clear, conflict, ad_valid;
-  logic [LM+D-1:0] first;
+  logic [D-1:0] en_acc, r_valid, r_last, reg_copy, reg_clear, conflict, ad_valid, m_first;
   logic [LM+LA+D-1:0] valid, valid_last;
 
   // Global Control
@@ -46,7 +43,6 @@ module axis_sa #(
   tri_buffer #(.W(WK), .N(C)) TRI_K (.clk(clk), .rstn(rstn), .cen(en_mac), .x(sk_reversed), .y(ki_delayed));
 
   // Delay control signals
-  n_delay #(.N(LM   +D), .W(1)) FIRST      (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(first_xk_00       ), .o(), .d(first));
   n_delay #(.N(LM+LA+D), .W(1)) VALID      (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid           ), .o(), .d(valid));
   n_delay #(.N(LM+LA+D), .W(1)) VALID_LAST (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid && s_last ), .o(), .d(valid_last));
 
@@ -76,16 +72,17 @@ module axis_sa #(
   end end
 
   // Accumulators - cleared at first beat of s_axis packet
-  always_ff @(posedge clk)
-    if (!rstn)                  first_xk_00 <= 1'b1;
-    else if (en_mac && s_valid) first_xk_00 <= s_last;
+  for (d=0; d<D; d=d+1)
+    always_ff @(posedge clk)
+      if (!rstn)            m_first[d] <= 1'b1;
+      else if (valid[LM+d]) m_first[d] <= valid_last[LM+d];
 
   for (r=0; r<R; r=r+1) begin: AR
     for (c=0; c<C; c=c+1) begin: AC
     // only accumulate valid data
       localparam d = `DIAG(r,c);
       assign en_acc[d] = en_mac && valid[LM+d]; 
-      acc #(.WX(WM),.WY(WY),.L(LA)) ACC (.clk(clk), .rstn(rstn), .en(en_acc[d]), .first (first[LM+d]), .x(mo[r][c]), .y(ao[r][c]));
+      acc #(.WX(WM),.WY(WY),.L(LA)) ACC (.clk(clk), .rstn(rstn), .en(en_acc[d]), .first(m_first[d]), .x(mo[r][c]), .y(ao[r][c]));
   end end
 
 
@@ -102,9 +99,8 @@ module axis_sa #(
   
   for (d=0; d<D; d=d+1)
     always_ff @(posedge clk)
-      if (!rstn)                         ad_valid[d] <= 0;
-      else if (conflict [d] && en_shift) ad_valid[d] <= 0;
-      else if (en_mac)                   ad_valid[d] <= valid_last[LM+LA+d-1];
+      if (!rstn)                ad_valid[d] <= 0;
+      else if (en_mac)          ad_valid[d] <= valid_last[LM+LA+d-1];
 
   for (d=0; d<D; d=d+1)
     always_comb begin
