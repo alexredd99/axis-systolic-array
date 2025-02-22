@@ -28,7 +28,7 @@ module acc #(
   logic signed [WY-1:0] a;
   always_ff @(posedge clk)
     if (!rstn)   a <= '0;
-    else if (en) a <= $signed(x) + $signed(first ? '0 : a);
+    else if (en) a <= WY'($signed(x)) + $signed(first ? WY'(0) : a);
 
   n_delay #(.N(L-1),.W(WY)) mac_delay (.c(clk),.e(en),.rng(rstn),.rnl(rstn),.i(a),.o(y),.d());
 endmodule

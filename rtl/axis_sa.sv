@@ -26,8 +26,8 @@ module axis_sa #(
   logic [R-1:0][C-1:0][WM-1:0] mo;
   logic [R-1:0][C-1:0][WY-1:0] ao, ro;
 
-  logic [D-1:0] en_acc, r_valid, r_last, reg_copy, reg_clear, conflict, ad_valid, m_first;
-  logic [LM+LA+D-1:0] valid, valid_last;
+  logic [D-1:0] en_acc, r_valid, r_last, r_copy, r_clear, conflict, a_valid, m_first;
+  logic [LM+LA+D-1:0] valid, vlast;
 
   // Global Control
   assign en_mac   = !(|conflict); // pull en_mac down if any acc is pushing data (avalid) and reg already has data (r_valid)
@@ -43,8 +43,8 @@ module axis_sa #(
   tri_buffer #(.W(WK), .N(C)) TRI_K (.clk(clk), .rstn(rstn), .cen(en_mac), .x(sk_reversed), .y(ki_delayed));
 
   // Delay control signals
-  n_delay #(.N(LM+LA+D), .W(1)) VALID      (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid           ), .o(), .d(valid));
-  n_delay #(.N(LM+LA+D), .W(1)) VALID_LAST (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid && s_last ), .o(), .d(valid_last));
+  n_delay #(.N(LM+LA+D), .W(1)) VALID (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid           ), .o(), .d(valid));
+  n_delay #(.N(LM+LA+D), .W(1)) VLAST (.c(clk), .e(en_mac), .rng(rstn), .rnl(rstn), .i(s_valid && s_last ), .o(), .d(vlast));
 
   // Propagate x and k through the array
   for (r=0; r<R; r=r+1)
@@ -75,7 +75,7 @@ module axis_sa #(
   for (d=0; d<D; d=d+1)
     always_ff @(posedge clk)
       if (!rstn)            m_first[d] <= 1'b1;
-      else if (valid[LM+d]) m_first[d] <= valid_last[LM+d];
+      else if (valid[LM+d]) m_first[d] <= vlast[LM+d];
 
   for (r=0; r<R; r=r+1) begin: AR
     for (c=0; c<C; c=c+1) begin: AC
@@ -99,35 +99,35 @@ module axis_sa #(
   
   for (d=0; d<D; d=d+1)
     always_ff @(posedge clk)
-      if (!rstn)                ad_valid[d] <= 0;
-      else if (en_mac)          ad_valid[d] <= valid_last[LM+LA+d-1];
+      if (!rstn)                a_valid[d] <= 0;
+      else if (en_mac)          a_valid[d] <= vlast[LM+LA+d-1];
 
   for (d=0; d<D; d=d+1)
     always_comb begin
-      conflict [d] = r_valid [d] && ad_valid[d]; // acc wants to send data, but reg already has data
-      reg_copy [d] = ad_valid[d] && !r_valid[d]; // copy only if acc can send data (ad_valid) and reg is empty (!r_valid)
-      reg_clear[d] = en_shift    &&  r_last [d]; // clear if current reg is last
+      conflict [d] = a_valid[d]  &&  r_valid[d]; // acc wants to send data, but reg already has data
+      r_copy   [d] = a_valid[d]  && !r_valid[d]; // copy only if acc can send data (a_valid) and reg is empty (!r_valid)
+      r_clear  [d] = en_shift    &&  r_last [d]; // clear if current reg is last
     end
 
   for (d=0; d<D; d=d+1)
     always_ff @(posedge clk)
       if (!rstn)                               r_valid[d] <= 0;
       else if (d >= C-1 && en_shift && m_last) r_valid[d] <= 0; // At the last beat, clear all diagonal regs beyond C
-      else if (reg_copy [d])                   r_valid[d] <= 1;
-      else if (reg_clear[d])                   r_valid[d] <= 0;
+      else if (r_copy [d])                     r_valid[d] <= 1;
+      else if (r_clear[d])                     r_valid[d] <= 0;
 
   // Output Register Data
   for (r=0; r<R; r=r+1) begin
     // c=0
     always_ff @(posedge clk)
-      if (!rstn)                       ro[r][0] <= '0;
-      else if (reg_copy[`DIAG(r,0)])   ro[r][0] <= ao[r][0];
+      if (!rstn)                     ro[r][0] <= '0;
+      else if (r_copy[`DIAG(r,0)])   ro[r][0] <= ao[r][0];
     // c!=0
     for (c=1; c<C; c=c+1)
       always_ff @(posedge clk)
-        if (!rstn)                     ro[r][c] <= '0;
-        else if (reg_copy[`DIAG(r,c)]) ro[r][c] <= ao[r][c];
-        else if (en_shift)             ro[r][c] <= ro[r][c-1];
+        if (!rstn)                   ro[r][c] <= '0;
+        else if (r_copy[`DIAG(r,c)]) ro[r][c] <= ao[r][c];
+        else if (en_shift)           ro[r][c] <= ro[r][c-1];
   end
 
   // Outputs

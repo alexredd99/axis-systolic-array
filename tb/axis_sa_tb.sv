@@ -3,10 +3,10 @@
 
 module axis_sa_tb;
   localparam 
-    R          = 2, 
-    C          = 2, 
+    R          = 8, 
+    C          = 4, 
     K          = 6,
-    WX         = 4, 
+    WX         = 8, 
     WK         = 4,
     LM         = 1,
     LA         = 1,
@@ -46,12 +46,12 @@ module axis_sa_tb;
 
   // Matrices
   // X(R,K) * K(K,C) = Y(R,C)
-  bit signed [NUM_EXP-1:0][R-1:0][K-1:0][WX-1:0] xm = '0; // (R,K)
-  bit signed [NUM_EXP-1:0][K-1:0][C-1:0][WK-1:0] km = '0; // (K,C)
-  bit signed [NUM_EXP-1:0][R-1:0][C-1:0][WY-1:0] ym = '0; // (R,C)
+  bit signed [NUM_EXP-1:0][R-1:0][K-1:0][WX-1:0] xm = 0; // (R,K)
+  bit signed [NUM_EXP-1:0][K-1:0][C-1:0][WK-1:0] km = 0; // (K,C)
+  bit signed [NUM_EXP-1:0][R-1:0][C-1:0][WY-1:0] ym = 0; // (R,C)
 
-  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WM-1:0] mm = '0;
-  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WY-1:0] am = '0;
+  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WM-1:0] mm = 0;
+  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WY-1:0] am = 0;
 
   logic [R-1:0][WX-1:0] x_row;
   logic [C-1:0][WK-1:0] k_col;
@@ -84,7 +84,7 @@ module axis_sa_tb;
       $display("%0d) km:", ns);
       for (int k=0; k<K; k++) begin
         $write("| ");
-        for (int c=0; c<R; c++) begin
+        for (int c=0; c<C; c++) begin
           km[ns][k][c] = WK'($urandom_range(0,2**WK-1));
           $write("%d ",  $signed(km[ns][k][c]));
         end
@@ -108,6 +108,7 @@ module axis_sa_tb;
       // Expected y
       for (int r=0; r<R; r++)
         for (int c=0; c<C; c++) begin
+          am[ns][K-1][r][c] = 0;
           for (int k=0; k<K; k++) begin
             am[ns][k][r][c] = $signed(xm[ns][r][k]) * $signed(km[ns][k][c]) + $signed(am[ns][k-1][r][c]);
           end
@@ -175,18 +176,18 @@ module axis_sa_tb;
         ao[r][c].d = DUT.ao[r][c];
         ro[r][c].d = DUT.ro[r][c];
 
-        xi[r][c].v   = DUT.valid[`DIAG(r,c)];
-        ki[r][c].v   = DUT.valid[`DIAG(r,c)];
-        mo[r][c].v   = DUT.valid[LM+`DIAG(r,c)];
+        xi[r][c].v   = DUT.valid  [`DIAG(r,c)];
+        ki[r][c].v   = DUT.valid  [`DIAG(r,c)];
+        mo[r][c].v   = DUT.valid  [LM+`DIAG(r,c)];
         mo[r][c].f   = DUT.m_first[`DIAG(r,c)];
-        ao[r][c].vin = DUT.valid_last[LM+LA+`DIAG(r,c)];
+        ao[r][c].vin = DUT.vlast  [LM+LA+`DIAG(r,c)];
 
-        ao[r][c].v   = DUT.ad_valid[`DIAG(r,c)];
+        ao[r][c].v   = DUT.a_valid [`DIAG(r,c)];
         ao[r][c].cf  = DUT.conflict[`DIAG(r,c)];
         ro[r][c].v   = DUT.r_valid [`DIAG(r,c)];
         ro[r][c].l   = DUT.r_last  [`DIAG(r,c)];
-        ro[r][c].cp  = DUT.reg_copy[`DIAG(r,c)];
-        ro[r][c].cl  = DUT.reg_clear[`DIAG(r,c)];
+        ro[r][c].cp  = DUT.r_clear [`DIAG(r,c)];
+        ro[r][c].cl  = DUT.r_copy  [`DIAG(r,c)];
         ro[r][c].cf  = DUT.conflict[`DIAG(r,c)];
       end
 endmodule 
