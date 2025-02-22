@@ -26,7 +26,7 @@ module axis_sa #(
   logic [R-1:0][C-1:0][WM-1:0] mo;
   logic [R-1:0][C-1:0][WY-1:0] ao, ro;
 
-  logic [D-1:0] en_acc, r_valid, r_last, r_copy, r_clear, conflict, a_valid, m_first;
+  logic [D-1:0] r_valid, r_last, r_copy, r_clear, conflict, a_valid, m_first;
   logic [LM+LA+D-1:0] valid, vlast;
 
   // Global Control
@@ -79,10 +79,8 @@ module axis_sa #(
 
   for (r=0; r<R; r=r+1) begin: AR
     for (c=0; c<C; c=c+1) begin: AC
-    // only accumulate valid data
       localparam d = `DIAG(r,c);
-      assign en_acc[d] = en_mac && valid[LM+d]; 
-      acc #(.WX(WM),.WY(WY),.L(LA)) ACC (.clk(clk), .rstn(rstn), .en(en_acc[d]), .first(m_first[d]), .x(mo[r][c]), .y(ao[r][c]));
+      acc #(.WX(WM),.WY(WY),.L(LA)) ACC (.clk(clk), .rstn(rstn), .en(en_mac), .x_valid(valid[LM+d]), .first(m_first[d]), .x(mo[r][c]), .y(ao[r][c]));
   end end
 
 
