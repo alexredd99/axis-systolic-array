@@ -13,7 +13,7 @@ module axis_sa_tb;
     WY         = WX + WK + $clog2(K),
     WXK_BUS    = WX*R + WK*C,
     WY_BUS     = WY*R,
-    P_VALID    = 100, 
+    P_VALID    = 1, 
     P_READY    = 100,
     CLK_PERIOD = 10, 
     NUM_EXP    = 50;
@@ -45,54 +45,55 @@ module axis_sa_tb;
 
   // Matrices
   // X(R,K) * K(K,C) = Y(R,C)
-  logic signed [NUM_EXP-1:0][R-1:0][K-1:0][WX-1:0] xm; // (R,K)
-  logic signed [NUM_EXP-1:0][K-1:0][C-1:0][WK-1:0] km; // (K,C)
-  logic signed [NUM_EXP-1:0][R-1:0][C-1:0][WY-1:0] ym; // (R,C)
+  logic signed [NUM_EXP-1:0][R-1:0][K-1:0][WX-1:0] xm = '0; // (R,K)
+  logic signed [NUM_EXP-1:0][K-1:0][C-1:0][WK-1:0] km = '0; // (K,C)
+  logic signed [NUM_EXP-1:0][R-1:0][C-1:0][WY-1:0] ym = '0; // (R,C)
 
   logic [R-1:0][WX-1:0] x_row;
   logic [C-1:0][WK-1:0] k_col;
   logic [WXK_BUS/2-1:0][1:0] xk2;
-  logic [WY-1:0] y_val;
+  logic signed [WY-1:0] y_val, y_exp;
   int ur = $urandom(500);
+  int ns, nm;
 
   
   initial 
-    for (int n=0; n<NUM_EXP; n++) begin
-      path_in  = $sformatf("inp_%0d.txt",n);
+    for (ns=0; ns<NUM_EXP; ns++) begin
+      path_in  = $sformatf("inp_%0d.txt",ns);
       file_in  = $fopen(path_in , "w");
 
-      path_exp = $sformatf("exp_%0d.txt",n);
+      path_exp = $sformatf("exp_%0d.txt",ns);
       file_exp = $fopen(path_exp, "w");
 
       // Randomize x
-      $display("%0d) xm:", n);
+      $display("%0d) xm:", ns);
       for (int r=0; r<R; r++) begin
         $write("| ");
         for (int k=0; k<K; k++) begin
-          xm[n][r][k] = WX'($urandom_range(0,2**WX-1));
-          $write("%d ",  $signed(xm[n][r][k]));
+          xm[ns][r][k] = WX'($urandom_range(0,2**WX-1));
+          $write("%d ",  $signed(xm[ns][r][k]));
         end 
-        $write("|\n");
+        $write("|\ns");
       end
 
       // Randomize k
-      $display("%0d) km:", n);
+      $display("%0d) km:", ns);
       for (int k=0; k<K; k++) begin
         $write("| ");
         for (int c=0; c<R; c++) begin
-          km[n][k][c] = WK'($urandom_range(0,2**WK-1));
-          $write("%d ",  $signed(km[n][k][c]));
+          km[ns][k][c] = WK'($urandom_range(0,2**WK-1));
+          $write("%d ",  $signed(km[ns][k][c]));
         end
-        $write("|\n");
+        $write("|\ns");
       end
 
       // Concat and write to file
       for (int k=0; k<K; k++) begin
 
         for (int r=0; r<R; r++)
-          x_row[r] = xm[n][r][k];
+          x_row[r] = xm[ns][r][k];
         for (int c=0; c<C; c++)
-          k_col[c] = km[n][k][c];
+          k_col[c] = km[ns][k][c];
 
         xk2 = {k_col, x_row};
 
@@ -101,24 +102,23 @@ module axis_sa_tb;
       end
 
       // Expected y
-      ym = 0;
       for (int r=0; r<R; r++)
         for (int c=0; c<C; c++)
           for (int k=0; k<K; k++)
-            ym[n][r][c] = $signed(ym[n][r][c]) + $signed(xm[n][r][k]) * $signed(km[n][k][c]);
+            ym[ns][r][c] = $signed(ym[ns][r][c]) + $signed(xm[ns][r][k]) * $signed(km[ns][k][c]);
       
-      $display("%0d) ym:", n);
+      $display("%0d) ym:", ns);
       for (int r=0; r<R; r++) begin
         $write("| ");
         for (int c=0; c<C; c++)
-          $write("%d ",  $signed(ym[n][r][c]));
-        $write("|\n");
+          $write("%d ",  $signed(ym[ns][r][c]));
+        $write("|\ns");
       end
 
 
       for (int c=0; c<C; c++) // last column comes out first
         for (int r=0; r<R; r++)
-          $fdisplay(file_exp, "%d",  $signed(ym[n][r][c]));
+          $fdisplay(file_exp, "%d",  $signed(ym[ns][r][c]));
       
       $fclose(file_in);
       $fclose(file_exp);
@@ -133,17 +133,17 @@ module axis_sa_tb;
     repeat(2) @(posedge clk);
     rstn = 1;
 
-    for (int n=0; n<NUM_EXP; n++) begin
-    
-      path_out = $sformatf("out_%0d.txt",n);
+    for (nm=0; nm<NUM_EXP; nm++) begin
+      path_out = $sformatf("out_%0d.txt",nm);
       sink.axis_pull (path_out);
       $display("Done axis pull");
 
       file_out = $fopen(path_out, "r");
-      for (int r=0; r<R; r++)
-        for (int c=C-1; c<=0; c--) begin
+      for (int c=0; c<C; c++) // output is in row-major order, not column-major
+        for (int r=0; r<R; r++) begin
           status = $fscanf(file_out,"%d\n", y_val);
-          assert (y_val == ym[n][r][c]) else $error("Output does not match");
+          y_exp = $signed(ym[nm][r][c]);
+          assert (y_val == y_exp) else $fatal("Output does not match, nm=%d, y_val=(%d) != y_exp(%d)", nm, $signed(y_val), $signed(y_exp));
         end
       $fclose(file_out);
     end
