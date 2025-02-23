@@ -1,3 +1,7 @@
 build
 vivado
 run
+
+py/build
+py/run
+py/vectors

@@ -3,9 +3,9 @@
 
 module axis_sa_tb;
   localparam 
-    R          = 8, // Rows of SA == rows of output matrix
-    C          = 4, // Cols of SA == cols of output matrix
-    K          = 2, // Cols of matrix_k and rows of matrix_k
+    R          = 2, // Rows of SA == rows of output matrix
+    C          = 2, // Cols of SA == cols of output matrix
+    K          = 6, // Cols of matrix_k and rows of matrix_k
     WX         = 8, // word width of matrix_k
     WK         = 4, // word width of matrix_k
     LM         = 2, // latency of multiplier
@@ -15,7 +15,7 @@ module axis_sa_tb;
     WXK_BUS    = WX*R + WK*C,    // input bus width, R rows of matrix_x and C cols of matrix_k
     WY_BUS     = WY*R,           // output bus width, R rows of matrix_y
     P_VALID    = 1,  // Probability with which s_valid is toggled
-    P_READY    = 50, // Probability with which m_ready is toggled
+    P_READY    = 1, // Probability with which m_ready is toggled
     CLK_PERIOD = 10,
     NUM_EXP    = 50;  // Number of experiments
 
