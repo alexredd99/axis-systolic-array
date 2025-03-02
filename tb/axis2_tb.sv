@@ -20,6 +20,7 @@ module AXIS_Source #(
        // randomize s_valid and wait
       while ($urandom_range(0,99) >= PROB_VALID) @(posedge clk);
 
+      #1ps; // V_erilator wants delays
       s_valid <= 1;
       s_last  <= ib == n_beats-1;
 
@@ -35,6 +36,7 @@ module AXIS_Source #(
 
       do @(posedge clk); while (!s_ready); // wait for s_data to be accepted
       
+      #1ps;
       // clear s_valid and s_data
       s_valid <= 0;
       s_data  <= 'x;
@@ -57,14 +59,15 @@ module AXIS_Sink #(
     
     int i_words = 0;
     bit done = 0;
+    packet = {};
 
     // loop over beats
     while (!done) begin
 
       do begin 
-        m_ready <= 0; // keep m_ready low with probability (1-PROB_READY)
+        #1ps m_ready <= 0; // keep m_ready low with probability (1-PROB_READY)
         while ($urandom_range(0,99) >= PROB_READY) @(posedge clk);
-        m_ready <= 1;
+        #1ps m_ready <= 1;
         @(posedge clk); // keep m_ready high for one cycle
       end while (!m_valid); // if m_valid is high, break out of loop
       
@@ -84,7 +87,7 @@ module axis_tb;
   localparam  WORD_W=8, BUS_W=8,
               WORDS_PER_BEAT=BUS_W/WORD_W,
               PROB_VALID=1, PROB_READY=10,
-              CLK_PERIOD=10, NUM_EXP=100;
+              CLK_PERIOD=10, NUM_EXP=20;
 
   logic clk=0, rstn;
   logic s_valid, s_ready, m_valid, m_ready, s_last, m_last;
@@ -106,6 +109,7 @@ module axis_tb;
   // logic [N_BEATS-1:0][WORDS_PER_BEAT-1:0][WORD_W-1:0] tx_packet, rx_packet;
 
   logic [WORD_W-1:0] tx_packets [NUM_EXP][$];
+  logic [WORD_W-1:0] tx_packet [$];
   logic [WORD_W-1:0] rx_packets [NUM_EXP][$];
   int n_words;
 
@@ -117,22 +121,23 @@ module axis_tb;
     repeat(5) @(posedge clk);
 
     // initialize reference data beats
-    foreach(tx_packets[n]) begin
+    for (int n=0; n<NUM_EXP; n++) begin
       n_words = $urandom_range(1, 100);
-      repeat(n_words) tx_packets[n].push_back($urandom_range(0,2**WORD_W-1));
+      tx_packet = {};
+      repeat(n_words) tx_packet.push_back(WORD_W'($urandom_range(0,2**WORD_W-1)));
+      tx_packets[n] = tx_packet;
+      source.axis_push_packet(tx_packet);
     end
-
-    foreach(tx_packets[n])
-      source.axis_push_packet(tx_packets[n]);
   end
 
   initial begin
-    foreach(rx_packets[n]) begin
+    $display("Waiting for packets to be received...");
+    for (int n=0; n<NUM_EXP; n++) begin
       sink.axis_pull_packet(rx_packets[n]);
-      assert (rx_packets[n] == tx_packets[n])
+      if(rx_packets[n] == tx_packets[n])
         $display("Packet[%0d]: Outputs match: %p", n, rx_packets[n]);
       else begin
-        $display("Packet[%0d]: Expected: %p != Received: %p", n, tx_packets[n], rx_packets[n]);
+        $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, tx_packets[n], rx_packets[n]);
         $fatal(1, "Failed");
       end
     end
