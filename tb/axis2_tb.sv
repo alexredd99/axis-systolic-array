@@ -1,8 +1,6 @@
 `timescale 1ns/1ps
 `define CEIL(a, b) (((a) + (b) - 1) / (b))
 
-`define FILE_TEST
-
 module AXIS_Source #(
   parameter  WORD_W=8, BUS_W=8, PROB_VALID=20,
   localparam WORDS_PER_BEAT = BUS_W/WORD_W
@@ -46,7 +44,7 @@ module AXIS_Source #(
   endtask
 
   task automatic read_file_to_queue (string filepath, output [WORD_W-1:0] q [$]);
-    int fd;
+    int fd, status;
     logic signed [WORD_W-1:0] val;
     q = {};
 
@@ -54,7 +52,7 @@ module AXIS_Source #(
     if (fd == 0) $fatal(1, "Error opening file %s", filepath);
 
     while (!$feof(fd)) begin
-      $fscanf(fd,"%d\n", val);
+      status = $fscanf(fd,"%d\n", val);
       q.push_back(val);
     end
     $fclose(fd);
@@ -130,12 +128,14 @@ module axis_tb;
   AXIS_Sink   #(.WORD_W(WORD_W), .BUS_W(BUS_W), .PROB_READY(PROB_READY)) sink   (.*);
   assign {s_ready, m_valid, m_data, m_keep, m_last} = {m_ready, s_valid, s_data, s_keep, s_last};
 
-  // typedef logic [WORD_W-1:0] packets_t [NUM_EXP][$];
-  // packets_t tx_packets, rx_packets;
-
   typedef logic [WORD_W-1:0] packet_t [$];
+
+`ifndef FILE_TEST
+  packet_t tx_packets [NUM_EXP], rx_packets [NUM_EXP];
+`else 
   packet_t tx_packet, rx_packet, temp, exp;
   string path_tx, path_rx;
+`endif
 
   int n_words;
 
@@ -144,36 +144,38 @@ module axis_tb;
     repeat(5) @(posedge clk);
     rstn <= 1;
 
-    // for (int n=0; n<NUM_EXP; n++) begin
-    //   n_words = $urandom_range(1, 100);
-    //   source.get_random_queue(tx_packets[n], n_words);
-    //   source.axis_push_packet(tx_packets[n]);
-    // end
-
     for (int n=0; n<NUM_EXP; n++) begin
-      path_tx = $sformatf("tx_%0d.txt", n);
-
-      // Prepare a random file
       n_words = $urandom_range(1, 100);
+
+`ifndef FILE_TEST
+      source.get_random_queue(tx_packets[n], n_words);
+      source.axis_push_packet(tx_packets[n]);
+`else
+      path_tx = $sformatf("tx_%0d.txt", n);
+      // Prepare a random file
       source.get_random_queue(temp, n_words);
       sink.write_queue_to_file(path_tx, temp);
-
       // Read the file back & push
       source.read_file_to_queue(path_tx, tx_packet);
       source.axis_push_packet(tx_packet);
+`endif
     end
   end
 
   initial begin
     $display("Waiting for packets to be received...");
     for (int n=0; n<NUM_EXP; n++) begin
-      // sink.axis_pull_packet(rx_packets[n]);
-      // if(rx_packets[n] == tx_packets[n])
-      //   $display("Packet[%0d]: Outputs match: %p\n", n, rx_packets[n]);
-      // else begin
-      //   $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, tx_packets[n], rx_packets[n]);
-      //   $fatal(1, "Failed");
 
+`ifndef FILE_TEST
+      sink.axis_pull_packet(rx_packets[n]);
+      if(rx_packets[n] == tx_packets[n])
+        $display("Packet[%0d]: Outputs match: %p\n", n, rx_packets[n]);
+      else begin
+        $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, tx_packets[n], rx_packets[n]);
+        $fatal(1, "Failed");
+      end
+
+`else
       path_rx = $sformatf("rx_%0d.txt", n);
 
       sink.axis_pull_packet(rx_packet);
@@ -186,6 +188,8 @@ module axis_tb;
         $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, exp, rx_packet);
         $fatal(1, "Failed");
       end
+`endif
+
     end
     $finish();
   end

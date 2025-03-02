@@ -19,7 +19,7 @@ module AXIS_Source #(
       s_valid <= 1;
       s_data  <= packet[i];    
       do @(posedge clk); while (!s_ready); // wait for s_data to be accepted
-      
+
       // clear s_valid and s_data
       s_valid <= 0;
       s_data  <= 'x;
@@ -89,7 +89,7 @@ module axis_tb;
     // initialize reference data beat
     foreach (tx_packet[n]) begin
       foreach (in_beat[w])
-        in_beat[w] = $urandom_range(0,2**WORD_W-1);
+        in_beat[w] = WORD_W'($urandom_range(0,2**WORD_W-1));
       tx_packet[n] = in_beat;
     end
     
