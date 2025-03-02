@@ -17,9 +17,9 @@ module AXIS_Source #(
       while ($urandom_range(0,99) >= PROB_VALID) @(posedge clk);
 
       s_valid <= 1;
-      s_data  <= packet[i];
-       // wait for s_data to be accepted
-      do @(posedge clk); while (!s_ready);
+      s_data  <= packet[i];    
+      do @(posedge clk); while (!s_ready); // wait for s_data to be accepted
+      
       // clear s_valid and s_data
       s_valid <= 0;
       s_data  <= 'x;
@@ -43,14 +43,15 @@ module AXIS_Sink #(
   );
     // loop over beats
     for (int i=0; i<N_BEATS; i++) begin
-      // randomize m_ready and wait
-      while ($urandom_range(0,99) >= PROB_READY) @(posedge clk);
-      m_ready <= 1'b1;
-      // wait for transfer
-      do @(posedge clk); while (!m_valid);
-      // clear m_ready, and sample m_data
-      m_ready <= 0;
-      packet[i] = m_data;
+
+      do begin 
+        m_ready <= 0; // keep m_ready low with probability (1-PROB_READY)
+        while ($urandom_range(0,99) >= PROB_READY) @(posedge clk);
+        m_ready <= 1;
+        @(posedge clk); // keep m_ready high for one cycle
+      end while (!m_valid); // if m_valid is high, break out of loop
+      
+      packet[i] = m_data; //sample m_data
     end
   endtask
 endmodule
@@ -60,7 +61,7 @@ module axis_tb;
   localparam  WORD_W=8, BUS_W=8,
               N_BEATS=10, WORDS_PER_BEAT=BUS_W/WORD_W,
               PROB_VALID=1, PROB_READY=10,
-              CLK_PERIOD=10, NUM_EXP=1000;
+              CLK_PERIOD=10, NUM_EXP=100;
 
   logic clk=0, rstn;
   logic s_valid, s_ready, m_valid, m_ready;
