@@ -27,11 +27,11 @@ module AXIS_Source #(
       for (int i=0; i<WORDS_PER_BEAT; i++) 
         if (i_words < total_words) begin
           s_data[i] <= packet[i_words];
-          s_keep    <= 1;
+          s_keep[i] <= 1;
           i_words += 1;
         end else begin
           s_data[i] <= 'x;
-          s_keep    <= 0;
+          s_keep[i] <= 0;
         end
 
       do @(posedge clk); while (!s_ready); // wait for s_data to be accepted
@@ -42,11 +42,30 @@ module AXIS_Source #(
       s_data  <= 'x;
     end
   endtask
+
+  task automatic read_file_to_queue (string filepath, output [WORD_W-1:0] q [$]);
+    int fd;
+    logic signed [WORD_W-1:0] val;
+
+    fd = $fopen(filepath, "r");
+    if (fd == 0) $fatal(1, "Error opening file %s", filepath);
+
+    while (!$feof(fd)) begin
+      $fscanf(fd,"%d\n", val);
+      q.push_back(val);
+    end
+    $fclose(fd);
+  endtask
+
+  task automatic get_random_queue (output logic [WORD_W-1:0] q [$], input int n_words);
+    repeat(n_words) q.push_back(WORD_W'($urandom_range(0,2**WORD_W-1)));
+  endtask
+
 endmodule
 
 
 module AXIS_Sink #(
-  parameter  WORD_W=8, BUS_W=8, PROB_READY=20,
+  parameter  WORD_W=8, BUS_W=32, PROB_READY=20,
              WORDS_PER_BEAT = BUS_W/WORD_W
 )(
   input  logic clk, m_valid, m_last,
@@ -55,7 +74,7 @@ module AXIS_Sink #(
   input  logic [WORDS_PER_BEAT-1:0][WORD_W-1:0] m_data
 );
 
-  task automatic axis_pull_packet(output [WORD_W-1:0] packet [$]);
+  task automatic axis_pull_packet(output logic [WORD_W-1:0] packet [$]);
     
     int i_words = 0;
     bit done = 0;
@@ -80,53 +99,45 @@ module AXIS_Sink #(
         end
     end
   endtask
+
+  task automatic write_queue_to_file (string filepath, input logic [WORD_W-1:0] q [$]);
+    int fd;
+    fd = $fopen(filepath, "w");
+    if (fd == 0) $fatal(1, "Error opening file %s", filepath);
+    foreach (q[i]) $fwrite(fd, "%d\n", q[i]);
+    $fclose(fd);
+  endtask
 endmodule
 
 module axis_tb;
-
-  localparam  WORD_W=8, BUS_W=8,
+  localparam  WORD_W=8, BUS_W=32,
               WORDS_PER_BEAT=BUS_W/WORD_W,
               PROB_VALID=1, PROB_READY=10,
               CLK_PERIOD=10, NUM_EXP=20;
 
-  logic clk=0, rstn;
+  logic clk=0, rstn=0;
+  initial forever #(CLK_PERIOD/2) clk = ~clk;
+
   logic s_valid, s_ready, m_valid, m_ready, s_last, m_last;
   logic [WORDS_PER_BEAT-1:0] s_keep, m_keep;
   logic [WORDS_PER_BEAT-1:0][WORD_W-1:0] s_data, m_data;
-  logic [WORDS_PER_BEAT-1:0][WORD_W-1:0] in_beat;
-
-  initial forever #(CLK_PERIOD/2) clk = ~clk;
-
   AXIS_Source #(.WORD_W(WORD_W), .BUS_W(BUS_W), .PROB_VALID(PROB_VALID)) source (.*);
   AXIS_Sink   #(.WORD_W(WORD_W), .BUS_W(BUS_W), .PROB_READY(PROB_READY)) sink   (.*);
+  assign {s_ready, m_valid, m_data, m_keep, m_last} = {m_ready, s_valid, s_data, s_keep, s_last};
 
-  assign s_ready = m_ready;
-  assign m_valid = s_valid;
-  assign m_data = s_data;
-  assign m_keep = s_keep;
-  assign m_last = s_last;
-
-  // logic [N_BEATS-1:0][WORDS_PER_BEAT-1:0][WORD_W-1:0] tx_packet, rx_packet;
-
-  logic [WORD_W-1:0] tx_packets [NUM_EXP][$];
-  logic [WORD_W-1:0] tx_packet [$];
-  logic [WORD_W-1:0] rx_packets [NUM_EXP][$];
+  typedef logic [WORD_W-1:0] packets_t [NUM_EXP][$];
+  packets_t tx_packets, rx_packets;
   int n_words;
 
   initial begin
     $dumpfile ("dump.vcd"); $dumpvars;
-    rstn = 0;
     repeat(5) @(posedge clk);
     rstn <= 1;
-    repeat(5) @(posedge clk);
 
-    // initialize reference data beats
     for (int n=0; n<NUM_EXP; n++) begin
       n_words = $urandom_range(1, 100);
-      tx_packet = {};
-      repeat(n_words) tx_packet.push_back(WORD_W'($urandom_range(0,2**WORD_W-1)));
-      tx_packets[n] = tx_packet;
-      source.axis_push_packet(tx_packet);
+      source.get_random_queue(tx_packets[n], n_words);
+      source.axis_push_packet(tx_packets[n]);
     end
   end
 
@@ -135,7 +146,7 @@ module axis_tb;
     for (int n=0; n<NUM_EXP; n++) begin
       sink.axis_pull_packet(rx_packets[n]);
       if(rx_packets[n] == tx_packets[n])
-        $display("Packet[%0d]: Outputs match: %p", n, rx_packets[n]);
+        $display("Packet[%0d]: Outputs match: %p\n", n, rx_packets[n]);
       else begin
         $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, tx_packets[n], rx_packets[n]);
         $fatal(1, "Failed");
