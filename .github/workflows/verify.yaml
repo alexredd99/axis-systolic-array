@@ -39,5 +39,5 @@ jobs:
     - name: Verify Full Design
       run: |
         export PATH=${HOME}/verilator/bin:$PATH
-        make verilator
+        make all
 

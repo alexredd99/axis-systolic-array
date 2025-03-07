@@ -5,187 +5,99 @@ module axis_sa_tb;
   localparam 
     R          = 2, // Rows of SA == rows of output matrix
     C          = 2, // Cols of SA == cols of output matrix
-    K          = 6, // Cols of matrix_k and rows of matrix_k
+    K_MIN      = 5, // Cols of matrix_k and rows of matrix_k
+    K_MAX      = 30,
     WX         = 8, // word width of matrix_k
     WK         = 4, // word width of matrix_k
     LM         = 2, // latency of multiplier
     LA         = 3, // latency of accumulator
-    WM         = WX + WK,        // word width of multiplier
-    WY         = WM + $clog2(K), // word width of accumulator
-    WXK_BUS    = WX*R + WK*C,    // input bus width, R rows of matrix_x and C cols of matrix_k
-    WY_BUS     = WY*R,           // output bus width, R rows of matrix_y
+    WM         = WX + WK,            // word width of multiplier
+    WY         = WM + $clog2(K_MAX), // word width of accumulator
     P_VALID    = 1,  // Probability with which s_valid is toggled
-    P_READY    = 1, // Probability with which m_ready is toggled
+    P_READY    = 5, // Probability with which m_ready is toggled
     CLK_PERIOD = 10,
     NUM_EXP    = 50;  // Number of experiments
 
   logic clk=0, rstn=0;
   initial forever #(CLK_PERIOD/2) clk = ~clk;
 
-  int file_in, file_out, file_exp, status;
-  string path_in, path_out, path_exp;
-
   // Systolic Array
-
-  logic s_ready, s_valid, s_last, m_ready, m_valid, m_last;
+  logic s_ready, sk_valid, sk_last, sx_valid, sx_last, m_ready, m_valid, m_last;
   logic [R-1:0][WX-1:0] sx_data;
   logic [C-1:0][WK-1:0] sk_data;
   logic [R-1:0][WY-1:0] m_data;
 
+  // Synchronize two streams
+  wire s_valid  = sx_valid && sk_valid;
+  wire s_last   = sx_last  && sk_last;
+  wire sx_ready = sk_valid && s_ready;
+  wire sk_ready = sx_valid && s_ready;
+  wire [R-1:0] m_keep = '1;
+
   axis_sa #(.R(R), .C(C), .WX(WX), .WK(WK), .WY(WY), .LM(LM), .LA(LA)) DUT (.*);
 
-  // AXI Stream Source and Sink
+  axis_source #(.WORD_W(WX), .BUS_W(WX*R), .PROB_VALID(P_VALID)) source_x (.clk(clk), .s_valid(sx_valid), .s_ready(sx_ready), .s_last(sx_last), .s_keep(), .s_data(sx_data));
+  axis_source #(.WORD_W(WK), .BUS_W(WK*C), .PROB_VALID(P_VALID)) source_k (.clk(clk), .s_valid(sk_valid), .s_ready(sk_ready), .s_last(sk_last), .s_keep(), .s_data(sk_data));
+  axis_sink   #(.WORD_W(WY), .BUS_W(WY*R), .PROB_READY(P_READY)) sink_y   (.*);
 
-  logic [WXK_BUS  -1:0] s_data;
-  logic [WXK_BUS/2-1:0] s_keep;
-  logic [R-1        :0] m_keep = '1;
+  typedef logic signed [WX-1:0] xp_t [$];
+  typedef logic signed [WK-1:0] kp_t [$];
+  typedef logic signed [WY-1:0] yp_t [$];
 
-  AXIS_Source #(.WORD_WIDTH(2 ), .BUS_WIDTH(WXK_BUS), .PROB_VALID(P_VALID)) source (.aclk(clk), .aresetn(rstn), .*);
-  AXIS_Sink   #(.WORD_WIDTH(WY), .BUS_WIDTH(WY_BUS ), .PROB_READY(P_READY)) sink   (.aclk(clk), .aresetn(rstn), .*);
-  assign {sk_data, sx_data} = s_data;
+  xp_t x_packets [NUM_EXP], x_packet;
+  kp_t k_packets [NUM_EXP], k_packet;
+  yp_t y_packets [NUM_EXP], e_packet, e_packets [NUM_EXP];
 
-  // Matrices
-  // X(R,K) * K(K,C) = Y(R,C)
-  bit signed [NUM_EXP-1:0][R-1:0][K-1:0][WX-1:0] xm = 0; // (R,K)
-  bit signed [NUM_EXP-1:0][K-1:0][C-1:0][WK-1:0] km = 0; // (K,C)
-  bit signed [NUM_EXP-1:0][R-1:0][C-1:0][WY-1:0] ym = 0; // (R,C)
-
-  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WM-1:0] mm = 0;
-  bit signed [NUM_EXP-1:0][K-1:0][R-1:0][C-1:0][WY-1:0] am = 0;
-
-  logic [R-1:0][WX-1:0] x_row;
-  logic [C-1:0][WK-1:0] k_col;
-  logic [WXK_BUS/2-1:0][1:0] xk2;
-  logic signed [WY-1:0] y_val, y_exp;
-  int ur = $urandom(500); // set random seed to get reproducible results
-  int ns, nm;
-
-  
-  initial 
-    for (ns=0; ns<NUM_EXP; ns++) begin
-      path_in  = $sformatf("inp_%0d.txt",ns);
-      file_in  = $fopen(path_in , "w");
-
-      path_exp = $sformatf("exp_%0d.txt",ns);
-      file_exp = $fopen(path_exp, "w");
-
-      // Randomize x
-      $display("%0d) xm:", ns);
-      for (int r=0; r<R; r++) begin
-        $write("| ");
-        for (int k=0; k<K; k++) begin
-          xm[ns][r][k] = WX'($urandom_range(0,2**WX-1));
-          $write("%d ",  $signed(xm[ns][r][k]));
-        end 
-        $write("|\n");
-      end
-
-      // Randomize k
-      $display("%0d) km:", ns);
-      for (int k=0; k<K; k++) begin
-        $write("| ");
-        for (int c=0; c<C; c++) begin
-          km[ns][k][c] = WK'($urandom_range(0,2**WK-1));
-          $write("%d ",  $signed(km[ns][k][c]));
-        end
-        $write("|\n");
-      end
-
-      // Concat and write to file
-      for (int k=0; k<K; k++) begin
-
-        for (int r=0; r<R; r++)
-          x_row[r] = xm[ns][r][k];
-        for (int c=0; c<C; c++)
-          k_col[c] = km[ns][k][c];
-
-        xk2 = {k_col, x_row};
-        for (int i=0; i<WXK_BUS/2; i++)
-          $fdisplay(file_in, "%d", xk2[i]);
-      end
-
-      // Expected y
-      for (int r=0; r<R; r++)
-        for (int c=0; c<C; c++) begin
-          am[ns][K-1][r][c] = 0;
-          for (int k=0; k<K; k++) begin
-            am[ns][k][r][c] = $signed(xm[ns][r][k]) * $signed(km[ns][k][c]) + $signed(am[ns][k-1][r][c]);
-          end
-          ym[ns][r][c] = am[ns][K-1][r][c];
-        end
-      
-      $display("%0d) ym:", ns);
-      for (int r=0; r<R; r++) begin
-        $write("| ");
-        for (int c=0; c<C; c++)
-          $write("%d ",  $signed(ym[ns][r][c]));
-        $write("|\n");
-      end
-
-      for (int c=0; c<C; c++)
-        for (int r=0; r<R; r++)
-          $fdisplay(file_exp, "%d",  $signed(ym[ns][r][c]));
-      
-      $fclose(file_in);
-      $fclose(file_exp);
-
-      source.axis_push (path_in);
-    end
+  logic signed [WY-1:0] val;
+  int rand_k;
 
   initial begin
-    $dumpfile ("axis_tb.vcd"); $dumpvars;
+    $dumpfile ("dump.vcd"); $dumpvars;
+    repeat(5) @(posedge clk);
+    rstn <= 1;
 
-    rstn = 0;
-    repeat(2) @(posedge clk);
-    rstn = 1;
+    for (int n=0; n<NUM_EXP; n++) begin
+      x_packet = {};
+      k_packet = {};
+      rand_k = $urandom_range(K_MIN, K_MAX);
+      source_k.get_random_queue(k_packet, rand_k*C); // (K,C)
+      source_x.get_random_queue(x_packet, rand_k*R); // (K,R)
 
-    for (nm=0; nm<NUM_EXP; nm++) begin
-      path_out = $sformatf("out_%0d.txt",nm);
-      sink.axis_pull (path_out);
-      $display("Done axis pull");
-
-      file_out = $fopen(path_out, "r");
-      for (int c=0; c<C; c++) // output is in row-major order, not column-major
+      // Expected output
+      e_packet = {};
+      for (int c=0; c<C; c++)
         for (int r=0; r<R; r++) begin
-          status = $fscanf(file_out,"%d\n", y_val);
-          y_exp = $signed(ym[nm][r][c]);
-          assert (y_val == y_exp) else $fatal(1,"Output does not match, nm=%d, y_val=(%d) != y_exp(%d)", nm, $signed(y_val), $signed(y_exp));
+          val = 0;
+          for (int k=0; k<rand_k; k++) 
+            val = $signed(val) + $signed(k_packet[k*C+c]) * $signed(x_packet[k*R+r]);
+          e_packet.push_back(val);
         end
-      $fclose(file_out);
+      x_packets[n] = x_packet;
+      k_packets[n] = k_packet;
+      e_packets[n] = e_packet;
+
+      //Multithread push
+      fork
+        source_k.axis_push_packet(k_packet);
+        source_x.axis_push_packet(x_packet);
+      join
+    end
+  end
+
+  initial begin
+    wait(rstn);
+    $display("Waiting for packets to be received...");
+    for (int n=0; n<NUM_EXP; n++) begin
+      sink_y.axis_pull_packet(y_packets[n]);
+
+      if(y_packets[n] == e_packets[n])
+        $display("Packet[%0d]: Outputs match: %p\n", n, y_packets[n]);
+      else begin
+        $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, e_packets[n], y_packets[n]);
+        $fatal(1, "Failed");
+      end
     end
     $finish();
   end
 
-  // debug signals
-  struct { logic [WX-1:0] d; logic v;                } xi [R][C];
-  struct { logic [WK-1:0] d; logic v;                } ki [R][C];
-  struct { logic [WM-1:0] d; logic v, f;             } mo [R][C];
-  struct { logic [WY-1:0] d; logic v, vin, cf;       } ao [R][C];
-  struct { logic [WY-1:0] d; logic v, l, cp, cl, cf; } ro [R][C];
-
-  genvar r,c;
-  for (r=0; r<R; r++)
-    for (c=0; c<C; c++)
-      always_comb begin
-
-        xi[r][c].d = DUT.xi[r][c];
-        ki[r][c].d = DUT.ki[r][c];
-        mo[r][c].d = DUT.mo[r][c];
-        ao[r][c].d = DUT.ao[r][c];
-        ro[r][c].d = DUT.ro[r][c];
-
-        xi[r][c].v   = DUT.valid  [`DIAG(r,c)];
-        ki[r][c].v   = DUT.valid  [`DIAG(r,c)];
-        mo[r][c].v   = DUT.valid  [LM+`DIAG(r,c)];
-        mo[r][c].f   = DUT.m_first[`DIAG(r,c)];
-        ao[r][c].vin = DUT.vlast  [LM+LA+`DIAG(r,c)];
-
-        ao[r][c].v   = DUT.a_valid [`DIAG(r,c)];
-        ao[r][c].cf  = DUT.conflict[`DIAG(r,c)];
-        ro[r][c].v   = DUT.r_valid [`DIAG(r,c)];
-        ro[r][c].l   = DUT.r_last  [`DIAG(r,c)];
-        ro[r][c].cp  = DUT.r_clear [`DIAG(r,c)];
-        ro[r][c].cl  = DUT.r_copy  [`DIAG(r,c)];
-        ro[r][c].cf  = DUT.conflict[`DIAG(r,c)];
-      end
 endmodule 
