@@ -7,8 +7,8 @@ READY_PROB = 50
 
 TB_MODULE = top_tb
 RUN_DIR = run
-BUILD_DIR = run/build
-DATA_DIR = run/build/data
+WORK_DIR = run/work
+DATA_DIR = $(WORK_DIR)/data
 FULL_DATA_DIR = $(abspath $(DATA_DIR))
 C_SOURCE = ../../c/sim.c
 SOURCES_FILE = sources.txt
@@ -21,13 +21,13 @@ XELAB_FLAGS = --snapshot $(TB_MODULE) -log elaborate.log --debug typical -sv_lib
 XSIM_FLAGS = --tclbatch $(XSIM_CFG)
 VERI_FLAGS = --binary -j 0 -O3 -DDIR=$(FULL_DATA_DIR)/ -DR=$(R) -DC=$(C) -DVALID_PROB=$(VALID_PROB) -DREADY_PROB=$(READY_PROB) -I$(RUN_DIR)\
 							-CFLAGS -DSIM -CFLAGS -DDIR=$(FULL_DATA_DIR)/ -CFLAGS -DR=$(R) -CFLAGS -DC=$(C) -CFLAGS -DK=$(K) \
-							-CFLAGS -g --Mdir ../$(BUILD_DIR) -CFLAGS -I$(FULL_DATA_DIR) --Wno-BLKANDNBLK --Wno-INITIALDLY
+							-CFLAGS -g --Mdir ../$(WORK_DIR) -CFLAGS -I$(FULL_DATA_DIR) --Wno-BLKANDNBLK --Wno-INITIALDLY
 
-# Ensure the build directories exist
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+# Ensure the work directories exist
+$(WORK_DIR):
+	mkdir -p $(WORK_DIR)
 
-$(DATA_DIR): | $(BUILD_DIR)
+$(DATA_DIR): | $(WORK_DIR)
 	mkdir -p $(DATA_DIR)
 
 # Golden model
@@ -35,35 +35,35 @@ $(DATA_DIR)/kxa.bin: $(DATA_DIR)
 	python run/golden.py --R $(R) --K $(K) --C $(C) --DIR $(FULL_DATA_DIR)
 
 # Compile C source
-c: $(BUILD_DIR) $(DATA_DIR)/kxa.bin
-	cd $(BUILD_DIR) && xsc $(C_SOURCE) $(XSC_FLAGS)
+c: $(WORK_DIR) $(DATA_DIR)/kxa.bin
+	cd $(WORK_DIR) && xsc $(C_SOURCE) $(XSC_FLAGS)
 
 # Run Verilog compilation
 vlog: c
-	cd $(BUILD_DIR) && xvlog -f ../$(SOURCES_FILE)  $(XVLOG_FLAGS)
+	cd $(WORK_DIR) && xvlog -f ../$(SOURCES_FILE)  $(XVLOG_FLAGS)
 
 # Elaborate design
 elab: vlog
-	cd $(BUILD_DIR) && xelab $(TB_MODULE) $(XELAB_FLAGS)
+	cd $(WORK_DIR) && xelab $(TB_MODULE) $(XELAB_FLAGS)
 
 # Run simulation
 xsim: elab $(DATA_DIR)
-	cd $(BUILD_DIR) && xsim $(TB_MODULE) $(XSIM_FLAGS)
+	cd $(WORK_DIR) && xsim $(TB_MODULE) $(XSIM_FLAGS)
 
-build_verilator: $(BUILD_DIR) $(DATA_DIR)/kxa.bin
+work_verilator: $(WORK_DIR) $(DATA_DIR)/kxa.bin
 	cd run && verilator --top $(TB_MODULE) -F $(SOURCES_FILE) $(C_SOURCE) $(VERI_FLAGS)
 
-veri: build_verilator $(DATA_DIR)
-	cd $(BUILD_DIR) && ./V$(TB_MODULE)
+veri: work_verilator $(DATA_DIR)
+	cd $(WORK_DIR) && ./V$(TB_MODULE)
 
 
 veri_axis: rtl/axis_sa.sv rtl/mac.sv rtl/n_delay.sv rtl/tri_buffer.sv tb/axis_sa_tb.sv tb/axis_vip/tb/axis_sink.sv tb/axis_vip/tb/axis_source.sv
-	mkdir -p run/build
-	verilator --binary -j 0 -O3 --trace --top axis_sa_tb -Mdir run/build/ $^ --Wno-BLKANDNBLK --Wno-INITIALDLY
-	@cd run && build/Vaxis_sa_tb
+	mkdir -p $(WORK_DIR)
+	verilator --binary -j 0 -O3 --trace --top axis_sa_tb -Mdir $(WORK_DIR)/ $^ --Wno-BLKANDNBLK --Wno-INITIALDLY
+	@cd run && work/Vaxis_sa_tb
 
-# Clean build directory
+# Clean work directory
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(WORK_DIR)*
 
 .PHONY: sim vlog elab run clean

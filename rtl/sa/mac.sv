@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 // multiply adder with latency L
-
+(* use_dsp = "yes" *)
 module mul #(
   parameter  WX=4, WK=8, L=1,
   localparam WY=WX+WK

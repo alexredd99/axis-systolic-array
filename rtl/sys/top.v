@@ -373,14 +373,14 @@ localparam      AXI_LEN_WIDTH           = 32,
                 TIMEOUT                 = 2, // since 0 gives error
 
     // Alex AXI DMA RD                
-                AXIS_ID_WIDTH           = 6,
-                AXIS_KEEP_ENABLE        = 1,//(AXI_WIDTH>8),
-                AXIS_KEEP_WIDTH         = (AXI_WIDTH/8),//(AXI_WIDTH/8),
+                AXIS_ID_WIDTH           = AXI_ID_WIDTH,
+                AXIS_KEEP_ENABLE        = 1,
+                AXIS_KEEP_WIDTH         = (AXI_WIDTH/8),
                 AXIS_LAST_ENABLE        = 1,
                 AXIS_ID_ENABLE          = 0,
                 AXIS_DEST_ENABLE        = 0,
                 AXIS_DEST_WIDTH         = 8,
-                LEN_WIDTH               = 32,
+                LEN_WIDTH               = AXI_LEN_WIDTH,
                 TAG_WIDTH               = 8,
                 ENABLE_SG               = 0,
                 ENABLE_UNALIGNED        = 1;

@@ -1,8 +1,5 @@
 run/build
+run/work*
 vivado
 .vscode
 docs/*.pptx
-
-py/build
-py/run
-py/vectors

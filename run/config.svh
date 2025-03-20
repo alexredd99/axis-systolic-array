@@ -4,7 +4,7 @@
 `define WY                  32
 `define LM                  1
 `define LA                  1
-`define AXI_WIDTH	          128
+`define AXI_WIDTH           128
 `define AXI_ID_WIDTH        6
 `define AXI_STRB_WIDTH      `AXI_WIDTH/8
 `define AXI_MAX_BURST_LEN   32
