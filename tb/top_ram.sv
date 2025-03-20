@@ -437,6 +437,14 @@ zipcpu_axi2ram #(
 );
 
 top #(
+    .R (R ),
+    .C (C ),
+    .WK(WK),
+    .WX(WX),
+    .WA(WA),
+    .WY(WY),
+    .LM(LM),
+    .LA(LA),
     .AXI_WIDTH        (AXI_WIDTH        ),
     .AXI_ID_WIDTH     (AXI_ID_WIDTH     ),
     .AXI_STRB_WIDTH   (AXI_STRB_WIDTH   ),

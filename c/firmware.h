@@ -3,11 +3,6 @@
 // Assume k,x,a are 8 bit, y is 32 bit
 #include "params.h"
 
-#define NK K*C
-#define NX R*K
-#define NY R*C
-#define NA NY
-
 typedef struct {
   signed char k [K][C];
   signed char x [K][R];

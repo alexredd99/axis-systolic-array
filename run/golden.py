@@ -3,7 +3,7 @@ import argparse
 
 def main(R, K, C, DIR):
     # Write R, C, K to a C header file
-    with open("run/build/data/params.h", "w") as f:
+    with open(f"{DIR}/params.h", "w") as f:
         f.write(f"#define R {R}\n")
         f.write(f"#define K {K}\n")
         f.write(f"#define C {C}\n")

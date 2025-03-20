@@ -243,7 +243,7 @@ alex_axis_adapter_any #(
   .S_KEEP_ENABLE (1),
   .S_KEEP_WIDTH  (AXI_WIDTH/8),
   .M_DATA_WIDTH  (K_BUS_W),
-  .M_KEEP_ENABLE (0),
+  .M_KEEP_ENABLE (1),
   .USER_ENABLE   (1),
   .USER_WIDTH    (AXIS_USER_WIDTH)
 ) ADAPTER_MM2S_K (
@@ -272,7 +272,7 @@ alex_axis_adapter_any #(
   .S_KEEP_ENABLE (1),
   .S_KEEP_WIDTH  (AXI_WIDTH/8),
   .M_DATA_WIDTH  (X_BUS_W),
-  .M_KEEP_ENABLE (0),
+  .M_KEEP_ENABLE (1),
   .USER_ENABLE   (1),
   .USER_WIDTH    (AXIS_USER_WIDTH)
 ) ADAPTER_MM2S_X (
@@ -299,9 +299,8 @@ alex_axis_adapter_any #(
 alex_axis_adapter_any #(
   .S_DATA_WIDTH  (AXI_WIDTH),
   .S_KEEP_ENABLE (1),
-  .S_KEEP_WIDTH  (AXI_WIDTH/8),
   .M_DATA_WIDTH  (A_BUS_W),
-  .M_KEEP_ENABLE (0),
+  .M_KEEP_ENABLE (1),
   .USER_ENABLE   (1),
   .USER_WIDTH    (AXIS_USER_WIDTH)
 ) ADAPTER_MM2S_A (
@@ -324,13 +323,12 @@ alex_axis_adapter_any #(
   .m_axis_tid    (),
   .m_axis_tdest  ()
 );
-
+localparam Y_KEEP_W = Y_BUS_W/8;
 alex_axis_adapter_any #(
   .S_DATA_WIDTH  (Y_BUS_W),
-  .S_KEEP_ENABLE (0),
+  .S_KEEP_ENABLE (1),
   .M_DATA_WIDTH  (AXI_WIDTH),
   .M_KEEP_ENABLE (1),
-  .M_KEEP_WIDTH  (AXI_WIDTH/8),
   .USER_ENABLE   (0)
 ) ADAPTER_S2MM (
   .clk           (clk),
@@ -339,7 +337,7 @@ alex_axis_adapter_any #(
   .s_axis_tvalid (m_y_tvalid),
   .s_axis_tlast  (m_y_tlast ),
   .s_axis_tdata  (m_y_tdata ),
-  .s_axis_tkeep  (),
+  .s_axis_tkeep  ({Y_KEEP_W{1'b1}}),
   .s_axis_tuser  (),
   .s_axis_tid    (),
   .s_axis_tdest  (),
