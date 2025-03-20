@@ -14,8 +14,8 @@ module axis_sa_tb;
     WM         = WX + WK,            // word width of multiplier
     WY         = WM + $clog2(K_MAX), // word width of accumulator
     P_VALID    = 1,  // Probability with which s_valid is toggled
-    P_READY    = 5, // Probability with which m_ready is toggled
-    CLK_PERIOD = 10,
+    P_READY    = 100, // Probability with which m_ready is toggled
+    CLK_PERIOD = 100,
     NUM_EXP    = 50;  // Number of experiments
 
   logic clk=0, rstn=0;
@@ -46,41 +46,35 @@ module axis_sa_tb;
 
   xp_t x_packets [NUM_EXP], x_packet;
   kp_t k_packets [NUM_EXP], k_packet;
-  yp_t y_packets [NUM_EXP], e_packet, e_packets [NUM_EXP];
+  yp_t y_packets [NUM_EXP], e_packet;
 
   logic signed [WY-1:0] val;
-  int rand_k;
+  int rand_ks [NUM_EXP];
 
   initial begin
     $dumpfile ("dump.vcd"); $dumpvars;
+    
+    for (int n=0; n<NUM_EXP; n++)
+      rand_ks[n] = $urandom_range(K_MIN, K_MAX);
+
     repeat(5) @(posedge clk);
     rstn <= 1;
 
     for (int n=0; n<NUM_EXP; n++) begin
       x_packet = {};
-      k_packet = {};
-      rand_k = $urandom_range(K_MIN, K_MAX);
-      source_k.get_random_queue(k_packet, rand_k*C); // (K,C)
-      source_x.get_random_queue(x_packet, rand_k*R); // (K,R)
-
-      // Expected output
-      e_packet = {};
-      for (int c=0; c<C; c++)
-        for (int r=0; r<R; r++) begin
-          val = 0;
-          for (int k=0; k<rand_k; k++) 
-            val = $signed(val) + $signed(k_packet[k*C+c]) * $signed(x_packet[k*R+r]);
-          e_packet.push_back(val);
-        end
+      source_x.get_random_queue(x_packet, rand_ks[n]*R); // (K,R)
       x_packets[n] = x_packet;
-      k_packets[n] = k_packet;
-      e_packets[n] = e_packet;
+      source_x.axis_push_packet(x_packet);
+    end
+  end
 
-      //Multithread push
-      fork
-        source_k.axis_push_packet(k_packet);
-        source_x.axis_push_packet(x_packet);
-      join
+  initial begin
+    wait(rstn);
+    for (int n=0; n<NUM_EXP; n++) begin
+      k_packet = {};
+      source_k.get_random_queue(k_packet, rand_ks[n]*C); // (K,C)
+      k_packets[n] = k_packet;
+      source_k.axis_push_packet(k_packet);
     end
   end
 
@@ -90,10 +84,19 @@ module axis_sa_tb;
     for (int n=0; n<NUM_EXP; n++) begin
       sink_y.axis_pull_packet(y_packets[n]);
 
-      if(y_packets[n] == e_packets[n])
-        $display("Packet[%0d]: Outputs match: %p\n", n, y_packets[n]);
+      e_packet = {};
+      for (int c=0; c<C; c++)
+        for (int r=0; r<R; r++) begin
+          val = 0;
+          for (int k=0; k<rand_ks[n]; k++) 
+            val = $signed(val) + $signed(k_packets[n][k*C+c]) * $signed(x_packets[n][k*R+r]);
+          e_packet.push_back(val);
+        end
+
+      if(y_packets[n] == e_packet)
+        $display("Packet[%0d]: Outputs match: %p\n", n, e_packet);
       else begin
-        $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, e_packets[n], y_packets[n]);
+        $display("Packet[%0d]: Expected: \n%p \n != \n Received: \n%p", n, e_packet, y_packets[n]);
         $fatal(1, "Failed");
       end
     end
