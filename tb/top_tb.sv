@@ -146,9 +146,9 @@ module top_tb;
 
   chandle mem_ptr_virtual, cfg_ptr_virtual;
   initial begin
-    rstn = 0;
+    rstn <= 0;
     repeat(2) @(posedge clk) #10ps;
-    rstn = 1;
+    rstn <= 1;
     mem_ptr_virtual = get_mp();
     
     while (dma_loopback(mem_ptr_virtual, cfg_ptr_virtual)) @(posedge clk) #10ps;

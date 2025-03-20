@@ -36,3 +36,19 @@ First update `XIL_PATH` in `run/xsim.bat`, then run these in powershell
 cd run
 ./xsim.bat
 ```
+
+## Resources & Performance
+
+Following was done on ZCU104. 
+```
+R=32,
+C=32,
+AXI_WIDTH=128
+WK=8
+WX=8
+WA=32
+WY=32
+FREQ=100MHz
+```
+
+![FPGA](docs/fpga.png)
