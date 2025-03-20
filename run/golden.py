@@ -9,21 +9,21 @@ def main(R, K, C, DIR):
         f.write(f"#define C {C}\n")
 
     # Generate random matrices
-    k = np.random.randint(-128, 127, size=(K, C), dtype=np.int8)
-    x = np.random.randint(-128, 127, size=(K, R), dtype=np.int8)
-    a = np.random.randint(-2147483648, 2147483647, size=(R, C), dtype=np.int32)
+    k = np.random.randint(-128, 127, size=(K, C), dtype=np.int32)
+    x = np.random.randint(-128, 127, size=(K, R), dtype=np.int32)
+    a = np.random.randint(-2147483648, 2147483647, size=(C, R), dtype=np.int32)
     
     # Concatenate matrices
     with open(f"{DIR}/kxa.bin", "wb") as f:
-        f.write(k.tobytes())
-        f.write(x.tobytes())
-        f.write(a.tobytes())
+        f.write(k.astype(np.int8 ).tobytes())
+        f.write(x.astype(np.int8 ).tobytes())
+        f.write(a.astype(np.int32).tobytes())
     
-    y = x.T @ k + a # y(R,C) = x.T(R,K) @ k.T (K,C) + a(R,C)
+    y = k.T @ x + a # y(C,R) = k.T(C,K) @ x(K,R) + a(C,R)
     
     # Write y to binary file
     with open(f"{DIR}/y_exp.bin", "wb") as f:
-        f.write(y.tobytes())
+        f.write(y.astype(np.int32).tobytes())
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate matrices and perform matrix operations.")

@@ -2,8 +2,8 @@
 R = 8
 C = 4
 K = 16
-VALID_PROB = 1000
-READY_PROB = 1000
+VALID_PROB = 1
+READY_PROB = 50
 
 TB_MODULE = top_tb
 RUN_DIR = run

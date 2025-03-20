@@ -27,7 +27,7 @@ jobs:
       run: |
         python3 -m pip install --upgrade pip
         pip install numpy
-        
+
     - name: Install Verilator
       run: |
         sudo apt-get install --only-upgrade python3
@@ -44,5 +44,5 @@ jobs:
     - name: Verify Full Design
       run: |
         export PATH=${HOME}/verilator/bin:$PATH
-        make all
+        make veri
 

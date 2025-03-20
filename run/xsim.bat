@@ -4,8 +4,8 @@ set TB_MODULE=top_tb
 set R=8
 set C=4
 set K=16
-set VALID_PROB=1000
-set READY_PROB=1000
+set VALID_PROB=1
+set READY_PROB=50
 
 SETLOCAL EnableDelayedExpansion
 mkdir "build\data"
