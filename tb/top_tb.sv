@@ -101,7 +101,7 @@ module top_tb;
   import "DPI-C" context function void set_byte_a32 (int unsigned addr, byte data);
   import "DPI-C" context function chandle get_mp ();
   // import "DPI-C" context function void print_output (chandle mem_ptr_virtual);
-  import "DPI-C" context function bit dma_loopback(chandle mem_ptr_virtual, chandle p_config);
+  import "DPI-C" context function bit run(chandle mem_ptr_virtual, chandle p_config);
 
 
   function automatic int get_config(chandle config_base, input int offset);
@@ -151,7 +151,7 @@ module top_tb;
     rstn <= 1;
     mem_ptr_virtual = get_mp();
     
-    while (dma_loopback(mem_ptr_virtual, cfg_ptr_virtual)) @(posedge clk) #10ps;
+    while (run(mem_ptr_virtual, cfg_ptr_virtual)) @(posedge clk) #10ps;
 
 
     // Read from output & expected and compare

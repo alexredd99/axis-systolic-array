@@ -44,7 +44,7 @@ int main()
   }
   flush_cache(p_mem->inp_arr, BYTES);
   
-  dma_loopback(p_mem, p_config);
+  run(p_mem, p_config);
 
   flush_cache(p_mem->out_arr, BYTES);
   usleep(0);
