@@ -1,6 +1,7 @@
 run/build
 vivado
 .vscode
+docs/*.pptx
 
 py/build
 py/run
