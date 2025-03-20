@@ -1,5 +1,6 @@
 run/build
 vivado
+.vscode
 
 py/build
 py/run

@@ -1,3 +1,4 @@
+../config.svh
 ../../rtl/sa/axis_sa.sv
 ../../rtl/sa/mac.sv
 ../../rtl/sa/n_delay.sv
@@ -9,6 +10,8 @@
 ../../rtl/ext/alex_axilite_ram.sv
 ../../rtl/ext/alex_axilite_rd.sv
 ../../rtl/ext/alex_axilite_wr.sv
+../../rtl/ext/alex_axis_adapter.sv
+../../rtl/ext/alex_axis_adapter_any.sv
 ../../tb/top_ram.sv
 ../../tb/top_tb.sv
 ../../tb/ext/axi_addr.v

@@ -16,7 +16,6 @@ typedef struct {
 } Memory_st;
 
 #define MEM_BASEADDR    0x20000000
-#define CONFIG_BASEADDR 0xA0000000
 #define A_START         0x0
 #define A_MM2S_0_DONE   0x1
 #define A_MM2S_0_ADDR   0x2
@@ -46,7 +45,7 @@ extern EXT_C u8 dma_loopback(Memory_st *restrict mp, void *p_config) {
 
     WAIT_INIT(DMA_WAIT);
 
-    sprintf(f_path, "%s/kxa.bin", TO_STRING(DIR));
+    sprintf(f_path, "%skxa.bin", TO_STRING(DIR));
     fp = fopen(f_path, "rb");
     debug_printf("DEBUG: Reading from file %s \n", f_path);
     if(!fp) debug_printf("ERROR! File not found: %s \n", f_path);
@@ -69,7 +68,7 @@ extern EXT_C u8 dma_loopback(Memory_st *restrict mp, void *p_config) {
   WAIT(!(get_config(p_config, A_S2MM_DONE)), DMA_WAIT);
 
   #ifdef SIM
-    sprintf(f_path, "%s/y.bin", TO_STRING(DIR));
+    sprintf(f_path, "%sy.bin", TO_STRING(DIR));
     fp = fopen(f_path, "wb");
     debug_printf("DEBUG: Writing to file %s \n", f_path);
     if(!fp) debug_printf("ERROR! File not found: %s \n", f_path);

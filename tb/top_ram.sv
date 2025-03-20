@@ -3,21 +3,30 @@
 
 module top_ram #(
     // Parameters for DNN engine
-    parameter   AXI_WIDTH         = 128,
-                AXI_ID_WIDTH      = 6,
-                AXI_STRB_WIDTH    = AXI_WIDTH/8,
-                AXI_MAX_BURST_LEN = 32,
-                AXI_ADDR_WIDTH    = 32,
-                AXIL_WIDTH        = 32,
-                AXIL_ADDR_WIDTH   = 40,
-                STRB_WIDTH        = 4,
-                AXIL_BASE_ADDR    = 32'hA0000000,
-                OPT_LOCK          = 1'b0,
-                OPT_LOCKID        = 1'b1,
-                OPT_LOWPOWER      = 1'b0,
+    parameter
+        R                 = 8,
+        C                 = 8,
+        WK                = 8,
+        WX                = 8,
+        WA                = 8,
+        WY                = 8,
+        LM                = 1,
+        LA                = 1,
+        AXI_WIDTH         = 128,
+        AXI_ID_WIDTH      = 6,
+        AXI_STRB_WIDTH    = AXI_WIDTH/8,
+        AXI_MAX_BURST_LEN = 32,
+        AXI_ADDR_WIDTH    = 32,
+        AXIL_WIDTH        = 32,
+        AXIL_ADDR_WIDTH   = 40,
+        STRB_WIDTH        = 4,
+        AXIL_BASE_ADDR    = 32'hA0000000,
+        OPT_LOCK          = 1'b0,
+        OPT_LOCKID        = 1'b1,
+        OPT_LOWPOWER      = 1'b0,
     // Randomizer for AXI4 requests
-                VALID_PROB        = 10,
-                READY_PROB        = 10,
+        VALID_PROB        = 1000,
+        READY_PROB        = 1000,
 
     localparam  LSB = $clog2(AXI_WIDTH)-3
 )(

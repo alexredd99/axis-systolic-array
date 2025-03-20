@@ -2,21 +2,26 @@
 R = 8
 C = 4
 K = 16
+VALID_PROB = 1000
+READY_PROB = 1000
 
 TB_MODULE = top_tb
+RUN_DIR = run
 BUILD_DIR = run/build
-DATA_DIR = $(BUILD_DIR)/data
+DATA_DIR = run/build/data
 FULL_DATA_DIR = $(abspath $(DATA_DIR))
 C_SOURCE = ../../c/sim.c
 SOURCES_FILE = sources.txt
 XSIM_CFG = ../xsim_cfg.tcl
 
 # Compiler options
-XSC_FLAGS = --gcc_compile_options -DSIM --gcc_compile_options -DDIR=$(FULL_DATA_DIR) --gcc_compile_options -I$(FULL_DATA_DIR)
-XVLOG_FLAGS = -sv -d "DIR=$(FULL_DATA_DIR)" 
+XSC_FLAGS = --gcc_compile_options -DSIM --gcc_compile_options -DDIR=$(FULL_DATA_DIR)/ --gcc_compile_options -I$(FULL_DATA_DIR)
+XVLOG_FLAGS = -sv -d "DIR=$(FULL_DATA_DIR)/" -d "R=$(R)" -d "C=$(C)" -d "VALID_PROB=$(VALID_PROB)" -d "READY_PROB=$(READY_PROB)" -i $(abspath $(RUN_DIR))
 XELAB_FLAGS = --snapshot $(TB_MODULE) -log elaborate.log --debug typical -sv_lib dpi
 XSIM_FLAGS = --tclbatch $(XSIM_CFG)
-VERI_FLAGS = --binary -j 0 -O3 -DDIR=$(FULL_DATA_DIR) -CFLAGS -DSIM -CFLAGS -DDIR=$(FULL_DATA_DIR) -CFLAGS -g --Mdir ../$(BUILD_DIR) -CFLAGS -I$(FULL_DATA_DIR)/ --Wno-BLKANDNBLK --Wno-INITIALDLY
+VERI_FLAGS = --binary -j 0 -O3 -DDIR=$(FULL_DATA_DIR)/ -DR=$(R) -DC=$(C) -DVALID_PROB=$(VALID_PROB) -DREADY_PROB=$(READY_PROB) -I$(RUN_DIR)\
+							-CFLAGS -DSIM -CFLAGS -DDIR=$(FULL_DATA_DIR)/ -CFLAGS -DR=$(R) -CFLAGS -DC=$(C) -CFLAGS -DK=$(K) \
+							-CFLAGS -g --Mdir ../$(BUILD_DIR) -CFLAGS -I$(FULL_DATA_DIR) --Wno-BLKANDNBLK --Wno-INITIALDLY
 
 # Ensure the build directories exist
 $(BUILD_DIR):

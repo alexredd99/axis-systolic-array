@@ -2,15 +2,35 @@
 `define STRINGIFY(x) `"x`"
 `define TO_STRING(x) `STRINGIFY(x)
 
+`include "config.svh"
+
 module top_tb;
-  localparam  AXIL_ADDR_WIDTH     = 40,
-              DATA_WR_WIDTH       = 32,
-              STRB_WIDTH          = 4,
-              DATA_RD_WIDTH       = 32,
-              AXI_WIDTH	          = 128,
-              AXI_ADDR_WIDTH	    = 32,
-              CLK_PERIOD          = 10,
-              LSB                 = $clog2(AXI_WIDTH)-3;             
+  localparam
+    // Defined in makefile
+    R                   = `R         ,
+    C                   = `C         ,
+    VALID_PROB          = `VALID_PROB,
+    READY_PROB          = `READY_PROB,
+    // Defined in config.svh
+    WK                  = `WK,
+    WX                  = `WX,
+    WA                  = `WA,
+    WY                  = `WY,
+    LM                  = `LM,
+    LA                  = `LA,
+    AXI_WIDTH	          = `AXI_WIDTH	       ,
+    AXI_ID_WIDTH        = `AXI_ID_WIDTH      ,
+    AXI_STRB_WIDTH      = `AXI_STRB_WIDTH    ,
+    AXI_MAX_BURST_LEN   = `AXI_MAX_BURST_LEN ,
+    AXI_ADDR_WIDTH	    = `AXI_ADDR_WIDTH	   ,
+    AXIL_WIDTH          = `AXIL_WIDTH        ,
+    AXIL_ADDR_WIDTH     = `AXIL_ADDR_WIDTH   ,
+    STRB_WIDTH          = `STRB_WIDTH        ,
+    DATA_WR_WIDTH       = `AXIL_WIDTH        ,
+    DATA_RD_WIDTH       = `AXIL_WIDTH        ,
+    AXIL_BASE_ADDR      = `AXIL_BASE_ADDR    ,
+    CLK_PERIOD          = 10,
+    LSB                 = $clog2(AXI_WIDTH)-3;
 
 
   // SIGNALS
@@ -50,7 +70,27 @@ module top_tb;
   logic [AXI_WIDTH    -1:0]      s2mm_data;
   logic [AXI_WIDTH/8  -1:0]      s2mm_strb;
 
-  top_ram dut(.*);
+  top_ram #(
+    .R                 (R                ), 
+    .C                 (C                ), 
+    .WK                (WK               ), 
+    .WX                (WX               ), 
+    .WA                (WA               ), 
+    .WY                (WY               ), 
+    .LM                (LM               ), 
+    .LA                (LA               ), 
+    .VALID_PROB        (VALID_PROB       ),
+    .READY_PROB        (READY_PROB       ),
+    .AXI_WIDTH         (AXI_WIDTH        ), 
+    .AXI_ID_WIDTH      (AXI_ID_WIDTH     ), 
+    .AXI_STRB_WIDTH    (AXI_STRB_WIDTH   ), 
+    .AXI_MAX_BURST_LEN (AXI_MAX_BURST_LEN), 
+    .AXI_ADDR_WIDTH    (AXI_ADDR_WIDTH   ), 
+    .AXIL_WIDTH        (AXIL_WIDTH       ), 
+    .AXIL_ADDR_WIDTH   (AXIL_ADDR_WIDTH  ), 
+    .STRB_WIDTH        (STRB_WIDTH       ), 
+    .AXIL_BASE_ADDR    (AXIL_BASE_ADDR   ) 
+  ) dut(.*);
 
   logic clk = 0;
   initial forever #(CLK_PERIOD/2) clk = ~clk;
@@ -115,8 +155,8 @@ module top_tb;
 
 
     // Read from output & expected and compare
-    file_out = $fopen({`TO_STRING(`DIR), "/y.bin"}, "rb");
-    file_exp = $fopen({`TO_STRING(`DIR), "/y_exp.bin" }, "rb");
+    file_out = $fopen({`TO_STRING(`DIR), "y.bin"}, "rb");
+    file_exp = $fopen({`TO_STRING(`DIR), "y_exp.bin" }, "rb");
     if (file_out==0 || file_exp==0) $fatal(0, "Error: Failed to open output/expected file(s).");
 
     while($feof(file_exp) == 0) begin
