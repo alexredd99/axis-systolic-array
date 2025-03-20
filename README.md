@@ -13,6 +13,16 @@ y(C,R) = k.T(C,K) @ x(K,R) + a(C,R)
 
 ![Full System](docs/sys.png)
 
+## Key files
+
+* `run/golden.py` - Python reference that performs `y = k.T @ x + a`
+* `run/sources.txt` - List of source files needed for simulation
+* `tb/top_tb.sv` - Top testbench
+* `rtl/sys/top.v` - Top RTL module with 4 M_AXI & one S_AXIL ports.
+* `c/firmware.h` - Contains the basic firmware
+* `rtl/sys/dma_controller.sv` - DMA controller that corresponds with firmware
+* `rtl/sa/axis_sa.sv` - AXI Stream Systolic array
+
 ## To simulate the entire system:
 
 ### Verilator (Linux)
