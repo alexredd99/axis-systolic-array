@@ -18,11 +18,11 @@ module top_tb;
     WY                  = `WY,
     LM                  = `LM,
     LA                  = `LA,
-    AXI_WIDTH	          = `AXI_WIDTH	       ,
+    AXI_WIDTH           = `AXI_WIDTH	       ,
     AXI_ID_WIDTH        = `AXI_ID_WIDTH      ,
     AXI_STRB_WIDTH      = `AXI_STRB_WIDTH    ,
     AXI_MAX_BURST_LEN   = `AXI_MAX_BURST_LEN ,
-    AXI_ADDR_WIDTH	    = `AXI_ADDR_WIDTH	   ,
+    AXI_ADDR_WIDTH      = `AXI_ADDR_WIDTH	   ,
     AXIL_WIDTH          = `AXIL_WIDTH        ,
     AXIL_ADDR_WIDTH     = `AXIL_ADDR_WIDTH   ,
     STRB_WIDTH          = `STRB_WIDTH        ,
@@ -160,7 +160,7 @@ module top_tb;
     if (file_out==0 || file_exp==0) $fatal(0, "Error: Failed to open output/expected file(s).");
 
     while($feof(file_exp) == 0) begin
-      if ($feof(file_exp)) $fatal(0, "Error: output file does not match the expected size.");
+      if ($feof(file_out)) $fatal(0, "Error: output file is shorter than expected file.");
       else begin
         out_byte = $fgetc(file_out);
         exp_byte = $fgetc(file_exp);
@@ -175,8 +175,8 @@ module top_tb;
     $fclose(file_exp);
     $fclose(file_out);
     
-    if (error==0) $display("Verification successful: Output matches Expected data. Error count: %0d", error);
-    else          $fatal (0, "Error: Output data does not match Expected data.");
+    if (error==0) $display("\n\nVerification successful: Output matches Expected data. \nError count: %0d\n\n", error);
+    else          $fatal (0, "\n\nERROR: Output data does not match Expected data.\n\n");
     $finish;
   end
 
