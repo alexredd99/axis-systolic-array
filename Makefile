@@ -27,7 +27,7 @@ $(DATA_DIR): | $(BUILD_DIR)
 
 # Golden model
 $(DATA_DIR)/kxa.bin: $(DATA_DIR)
-	python py/golden.py --R $(R) --K $(K) --C $(C) --DIR $(FULL_DATA_DIR)
+	python run/golden.py --R $(R) --K $(K) --C $(C) --DIR $(FULL_DATA_DIR)
 
 # Compile C source
 c: $(BUILD_DIR) $(DATA_DIR)/kxa.bin
