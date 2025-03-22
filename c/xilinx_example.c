@@ -26,6 +26,9 @@ static inline void flush_cache(void *addr, uint32_t bytes) {
 
 #include "firmware.h"
 
+XTime time_start, time_end;
+#define NUM_EXP 100
+
 int main()
 {
   init_platform();
@@ -40,13 +43,17 @@ int main()
   xil_printf("Hello! Config:%p, Mem:%p\n", p_config, p_mem);
 
   randomize_inputs(p_mem, 500);
-  
-  printf("Starting...\n");
-  flush_cache(p_mem->k, sizeof(p_mem->k)+sizeof(p_mem->x)+sizeof(p_mem->a));
-  run(p_mem, p_config);
-  flush_cache(p_mem->y, sizeof(p_mem->y));
-  usleep(0);
-  printf("Done...\n");
+  printf("Starting %d runs...\n", NUM_EXP);
+  XTime_GetTime(&time_start);
+
+  for (int i=0; i<NUM_EXP; i++){
+    flush_cache(p_mem->k, sizeof(p_mem->k)+sizeof(p_mem->x)+sizeof(p_mem->a));
+    run(p_mem, p_config);
+    flush_cache(p_mem->y, sizeof(p_mem->y));
+    usleep(0);
+  }
+  XTime_GetTime(&time_end);
+  printf("Done. Total time taken: %ld us\n", (1000000*(time_end-time_start))/COUNTS_PER_SECOND);
 
   check_output(p_mem);
 
