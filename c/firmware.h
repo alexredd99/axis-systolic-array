@@ -72,3 +72,47 @@ extern EXT_C u8 run(Memory_st *restrict mp, void *p_config) {
   #endif
   return 0;
 }
+
+
+void randomize_inputs(Memory_st *restrict mp, int seed){
+  srand(seed);
+
+  for (int k=0; k<K; k++)
+    for (int c=0;c<C; c++)
+      mp->k[k][c] = rand();
+
+  for (int k=0; k<K; k++)
+    for (int r=0;r<R; r++)
+      mp->x[k][r] = rand();
+
+  for (int c=0; c<C; c++)
+    for (int r=0;r<R; r++)
+      mp->a[c][r] = rand();
+}
+
+void check_output(Memory_st *restrict mp){
+
+  signed int y_exp [C][R];
+
+  for (int c=0; c<C; c++)
+    for (int r=0; r<R; r++){
+      int sum = 0;
+      for (int k=0; k<K; k++)
+        sum += (int)(mp->k[k][c]) * (int)(mp->x[k][r]);
+      sum += mp->a[c][r];
+      y_exp[c][r] = sum;
+    }
+
+  int error = 0;
+
+  for (int c=0; c<C; c++)
+    for (int r=0; r<R; r++)
+      if (mp->y[c][r] != y_exp[c][r]){
+        error += 1;
+        printf("Output does not match at [r:%d,c:%d]. y=%d, y_exp=%d\n", r,c,mp->y[c][r], y_exp[c][r]);
+      } else {
+        printf("Outputs match at [r:%d,c:%d]. y=%d, y_exp=%d\n", r,c,mp->y[c][r], y_exp[c][r]);
+      }
+
+  printf("All outputs match. Error count: %d \n", error);
+}
