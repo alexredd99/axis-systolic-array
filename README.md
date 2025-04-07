@@ -51,16 +51,10 @@ cd run
 
 #### Vivado: 
 
-1. Create block diagram, add ZYNQ, run block automation, configure it to enable 3 AXI slaves and 1 AXI master.
-1. Add all files in `rtl` to design
-1. Drag and drop `top.v` to block diagram
-1. Double click on `top.v`, edit the parameters to match `run/build/params.h`
-1. Connect the 3 MM2S ports to the AXI slaves.
-1. Run automation to connect the AXI Lite slave to the ZYNQ.
-1. Edit the address map such that the address of AXI-Lite slave is same as CONFIG_BASEADDR in `run/build/params.h`
-1. Ensure address ranges of AXI slaves contain `MEM_BASEADDR + sizeof(all data)`. 
-1. Generate HDL wrapper for block design, set as top.
-1. Validate design, generate bitstream, export hardware.
+Open vivado, cd into `run/work` and run the following:
+```
+source ../vivado_flow.tcl
+```
 
 #### Vitis:
 
