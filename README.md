@@ -58,10 +58,10 @@ source ../vivado_flow.tcl
 
 #### Vitis:
 
-1. Launch SDK, create a new application project, select `Custom XSA` and select the exported hardware.
+1. Launch SDK, create a new application project, select `Custom XSA` and select `run/work/sa_zcu104/design_1_wrapper.xsa`.
 1. Choose Hello World template.
 1. Copy and paste the contents of `c/xilinx_example.c` to `helloworld.c`
-1. Right click on project, `C/C++ build settings`, select `Directories` and add `c/` and `run/work/data/` to the include path.
+1. Right click on project, `C/C++ build settings`, select `Directories` and add `c/` to the include path.
 1. Build the project.
 1. Connect the ZCU104 to the host machine, turn it on.
 1. Right click on the project, `Run As`, `Debug: Launch on Hardware (Single Application Debug)`

@@ -14,11 +14,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#define R 8
-#define C 4
 #define K 16
-#define CONFIG_BASEADDR 0xA0000000
-#define DIR
 
 static inline void flush_cache(void *addr, uint32_t bytes) {
   Xil_DCacheFlushRange((INTPTR)addr, bytes);
