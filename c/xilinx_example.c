@@ -16,6 +16,11 @@
 
 #define K 16
 
+// Make sure this matches RTL & TCL
+#define CONFIG_BASEADDR 0xB0000000
+#define R 8
+#define C 4
+
 static inline void flush_cache(void *addr, uint32_t bytes) {
   Xil_DCacheFlushRange((INTPTR)addr, bytes);
 }
