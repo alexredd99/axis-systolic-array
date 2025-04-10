@@ -3,11 +3,11 @@
 module top #(
     parameter
         R  = 8,
-        C  = 8,
+        C  = 4,
         WK = 8,
         WX = 8,
-        WA = 8,
-        WY = 8,
+        WA = 32,
+        WY = 32,
         LM = 1,
         LA = 1,
 
@@ -22,7 +22,7 @@ module top #(
         AXIL_WIDTH              = 32,
         AXIL_ADDR_WIDTH         = 40,
         STRB_WIDTH              = 4,
-        AXIL_BASE_ADDR          = 32'hA0000000
+        AXIL_BASE_ADDR          = 32'hB0000000
 
 ) (
     // axilite interface for configuration

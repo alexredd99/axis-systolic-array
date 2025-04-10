@@ -1,4 +1,4 @@
-`define WK                  8        
+`define WK                  8
 `define WX                  8
 `define WA                  32
 `define WY                  32
@@ -12,4 +12,4 @@
 `define AXIL_WIDTH          32
 `define AXIL_ADDR_WIDTH     40
 `define STRB_WIDTH          4 
-`define AXIL_BASE_ADDR      32'hA0000000
+`define AXIL_BASE_ADDR      32'hB0000000

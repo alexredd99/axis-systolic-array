@@ -1,7 +1,9 @@
 // DIR are macros defined through compiler options, or outside
 
-// Assume k,x,a are 8 bit, y is 32 bit
-#include "params.h"
+#ifdef SIM
+  // Assume k,x,a are 8 bit, y is 32 bit
+  #include "params.h"
+#endif
 
 typedef struct {
   signed char k [K][C];
