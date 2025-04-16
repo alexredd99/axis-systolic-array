@@ -18,7 +18,7 @@ module n_delay #(
   genvar n;
   generate 
   for (n=0 ; n < N; n++) begin : n_dat
-    always_ff @(posedge c or negedge rng)
+    always_ff @(posedge c)
       if (!rng)      data [n+1] <= 0;
       else if (!rnl) data [n+1] <= 0;
       else if (e)    data [n+1] <= data [n];
