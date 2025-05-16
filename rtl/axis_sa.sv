@@ -3,49 +3,60 @@
 `timescale 1ns / 1ps
 `define DIAG(a, b) (a+b)
 
-
-module mac_wrapper #(
-    parameter int unsigned MacType = 0
-) (
-
-);
-
-endmodule
-
-
+typedef enum int {
+  MAC_INT = 0,
+  MAC_FP  = 1
+} mac_type_e;
 
 module axis_sa #(
-    parameter  string       Par        = "test",
-    parameter  int unsigned Rows       = 4,
-    parameter  int unsigned Cols       = 8,
-    parameter  int unsigned WidthX     = 4,
-    parameter  int unsigned WidthK     = 8,
-    parameter  int unsigned WidthY     = 16,
-    parameter  int unsigned LatencyMul = 1,
-    parameter  int unsigned LatencyAcc = 1,
-    // Derived
-    parameter  int unsigned WidthM     = WidthX + WidthK,       // MAC out
-    localparam int unsigned DiagLen    = `DIAG(Rows, Cols) - 1
+    // Generic params
+    parameter int unsigned LatencyMul = 1,
+    parameter int unsigned LatencyAcc = 1,
+    parameter int unsigned Rows = 4,
+    parameter int unsigned Cols = 8,
+    parameter int unsigned WidthY = 16,  // Accumulator Width
+    parameter mac_type_e MacType = MAC_INT,
+    // Integer MAC params
+    parameter int unsigned WidthX = 4,
+    parameter int unsigned WidthK = 8,
+    // Minifloat MAC params
+    parameter int unsigned ExpWidthX = 4,
+    parameter int unsigned ExpWidthK = 4,
+    parameter int unsigned ManWidthX = 3,
+    parameter int unsigned ManWidthK = 3,
+    // Derived integer MAC params
+    parameter int unsigned WidthM = WidthX + WidthK,  // MAC out
+    // Derived minifloat MAC params
+    localparam int unsigned FpWidthX = 1 + ExpWidthX + ManWidthX,
+    localparam int unsigned FpWidthK = 1 + ExpWidthK + ManWidthK,
+    localparam int unsigned ManWidthMax = `MAX(ManWidthX, ManWidthK),
+    localparam int unsigned ExpWidthMax = `MAX(ExpWidthX, ExpWidthK),
+    localparam int unsigned FpWidthM = 2 * (ManWidthMax + (2 ** ExpWidthMax)),
+    // Generic derived params
+    localparam int unsigned DiagLen = `DIAG(Rows, Cols) - 1,
+    localparam int unsigned ActualWidthX = (MacType == MAC_INT) ? WidthX : FpWidthX,
+    localparam int unsigned ActualWidthK = (MacType == MAC_INT) ? WidthK : FpWidthK,
+    localparam int unsigned ActualWidthM = (MacType == MAC_INT) ? WidthY : FpWidthM
 ) (
-    input  logic                        clk_i,
-    input  logic                        rst_ni,
-    input  logic                        s_valid_i,
-    input  logic                        s_last_i,
-    input  logic                        m_ready_i,
-    output logic                        s_ready_o,
-    output logic                        m_valid_o,
-    output logic                        m_last_o,
-    input  logic [Rows-1:0][WidthX-1:0] sx_data_i,
-    input  logic [Cols-1:0][WidthK-1:0] sk_data_i,
-    output logic [Rows-1:0][WidthY-1:0] m_data_o
+    input  logic                              clk_i,
+    input  logic                              rst_ni,
+    input  logic                              s_valid_i,
+    input  logic                              s_last_i,
+    input  logic                              m_ready_i,
+    output logic                              s_ready_o,
+    output logic                              m_valid_o,
+    output logic                              m_last_o,
+    input  logic [Rows-1:0][ActualWidthX-1:0] sx_data_i,
+    input  logic [Cols-1:0][ActualWidthK-1:0] sk_data_i,
+    output logic [Rows-1:0][      WidthY-1:0] m_data_o
 );
   logic en_mac, en_shift;
 
-  logic [Rows-1:0][WidthX-1:0] xi_delayed;
-  logic [Cols-1:0][WidthK-1:0] ki_delayed, sk_reversed;
-  logic [Rows-1:0][Cols-1:0][WidthX-1:0] xi;
-  logic [Rows-1:0][Cols-1:0][WidthK-1:0] ki;
-  logic [Rows-1:0][Cols-1:0][WidthM-1:0] mo;
+  logic [Rows-1:0][ActualWidthX-1:0] xi_delayed;
+  logic [Cols-1:0][ActualWidthK-1:0] ki_delayed, sk_reversed;
+  logic [Rows-1:0][Cols-1:0][ActualWidthX-1:0] xi;
+  logic [Rows-1:0][Cols-1:0][ActualWidthK-1:0] ki;
+  logic [Rows-1:0][Cols-1:0][ActualWidthM-1:0] mo;
   logic [Rows-1:0][Cols-1:0][WidthY-1:0] ao, ro;
 
   // Control Signals are passed diagonally through the array
@@ -62,7 +73,7 @@ module axis_sa #(
 
   // Triangular Buffer for x and k
   tri_buffer #(
-      .Width(WidthX),
+      .Width(ActualWidthX),
       .Size (Rows)
   ) i_tri_x (
       .clk_i (clk_i),
@@ -73,7 +84,7 @@ module axis_sa #(
   );
 
   tri_buffer #(
-      .Width(WidthK),
+      .Width(ActualWidthK),
       .Size (Cols)
   ) i_tri_k (
       .clk_i (clk_i),
@@ -128,18 +139,35 @@ module axis_sa #(
   // Multipliers
   for (genvar r = 0; r < Rows; r++) begin : MR
     for (genvar c = 0; c < Cols; c++) begin : MC
-      mul #(
-          .WidthX (WidthX),
-          .WidthK (WidthK),
-          .Latency(LatencyMul)
-      ) MUL (
-          .clk_i (clk_i),
-          .rst_ni(rst_ni),
-          .en_i  (en_mac),
-          .x_i   (xi[r][c]),
-          .k_i   (ki[r][c]),
-          .y_o   (mo[r][c])
-      );
+      if (MacType == MAC_INT) begin
+        integer_multiplier #(
+            .WidthX (WidthX),
+            .WidthK (WidthK),
+            .Latency(LatencyMul)
+        ) MUL (
+            .clk_i (clk_i),
+            .rst_ni(rst_ni),
+            .en_i  (en_mac),
+            .x_i   (xi[r][c]),
+            .k_i   (ki[r][c]),
+            .y_o   (mo[r][c])
+        );
+      end else begin
+        minifloat_multiplier #(
+            .ExpWidthX(ExpWidthX),
+            .ExpWidthK(ExpWidthK),
+            .ManWidthX(ManWidthX),
+            .ManWidthK(ManWidthK),
+            .Latency  (LatencyMul)
+        ) MUL (
+            .clk_i (clk_i),
+            .rst_ni(rst_ni),
+            .en_i  (en_mac),
+            .x_i   (xi[r][c]),
+            .k_i   (ki[r][c]),
+            .y_o   (mo[r][c])
+        );
+      end
     end
   end
 
@@ -154,7 +182,7 @@ module axis_sa #(
     for (genvar c = 0; c < Cols; c++) begin : AC
       localparam d = `DIAG(r, c);
       acc #(
-          .WidthX (WidthM),
+          .WidthX (ActualWidthM),
           .WidthY (WidthY),
           .Latency(LatencyAcc)
       ) ACC (

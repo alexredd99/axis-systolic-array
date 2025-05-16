@@ -5,6 +5,9 @@ plugin -i slang
 # Import commands from plugins to tcl interpreter
 yosys -import
 
+set script_location [file dirname [file normalize [info script]]]
+set rtl_path "$script_location/../rtl/axis_sa.sv"
+
 set top_module axis_sa
 
 set new_params [list]
@@ -13,7 +16,7 @@ foreach param [lrange $argv 0 end] {
   puts "Setting $param"
 }
 
-eval read_slang axis_sa.sv --top $top_module $new_params
+eval read_slang $rtl_path --top $top_module $new_params
 
 procs;;
 clean -purge
