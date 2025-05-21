@@ -27,7 +27,7 @@ foreach arg $::argv {
   # Match pattern: key=value
   if {[regexp {(\w+)=([^ ]+)} $arg -> key val]} {
     if {$key eq "output_dir"} {
-      set $opt($key) $val
+      set opt(output_dir) $val
     } else {
       lappend opt(params) -G$key=$val
     }
