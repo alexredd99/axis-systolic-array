@@ -25,11 +25,10 @@ setundef -zero
 proc export_synth {output_path} {
   file mkdir $output_path
   write_json $output_path/synth.json
-  # write_verilog $output_path/synth.v
 }
 
 flatten
-puts [export_synth {output/0_proc}]
+puts [export_synth {synth_output/0_proc}]
 
 # Synthesize design
 synth -top $top_module
@@ -37,4 +36,4 @@ clean -purge
 autoname
 setundef -zero
 
-puts [export_synth {output/1_synth}]
+puts [export_synth {synth_output/1_synth}]
