@@ -3,3 +3,4 @@ run/work*
 vivado
 .vscode
 docs/*.pptx
+output
