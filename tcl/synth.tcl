@@ -19,6 +19,7 @@ set opt(rtl_path) "$tcl_dir/../rtl/axis_sa.sv"
 proc export_synth {output_dir} {
   file mkdir $output_dir
   write_json $output_dir/synth.json
+  tee -o $output_dir/torder.txt torder
 }
 
 
@@ -35,19 +36,19 @@ foreach arg $::argv {
 }
 
 # Read RTL
-eval read_slang $opt(rtl_path) --top $opt(top_module) $opt(params)
+eval read_slang $opt(rtl_path) --top $opt(top_module) --keep-hierarchy $opt(params)
 
 procs;;
-clean -purge
+clean
 setundef -zero
-flatten
+flatten -scopename
 
 # Export process netlist
 export_synth "$opt(output_dir)/0_proc"
 
 # Synthesize design
 synth
-clean -purge
+clean
 autoname
 setundef -zero
 export_synth "$opt(output_dir)/1_synth"
